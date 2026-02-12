@@ -72,6 +72,25 @@ export async function validateOsuPath(path: string): Promise<boolean> {
   }
 }
 
+export async function startProxy(): Promise<void> {
+  if (isConnected() || isConnecting()) return;
+
+  store.isLoading = true;
+  store.appState.status = "connecting";
+  store.appState.last_error = null;
+
+  try {
+    await invoke("start_proxy");
+    store.appState.status = "connected";
+  } catch (e) {
+    console.error("Failed to start proxy:", e);
+    store.appState.status = "error";
+    store.appState.last_error = String(e);
+  } finally {
+    store.isLoading = false;
+  }
+}
+
 export async function connect(): Promise<void> {
   if (!canConnect()) return;
 

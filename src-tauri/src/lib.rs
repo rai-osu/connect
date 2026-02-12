@@ -14,7 +14,8 @@ use infrastructure::logging::{LogBuffer, LogCaptureLayer};
 use interface::{
     clear_logs, connect, detect_osu, disconnect, get_certificate_path, get_config, get_logs,
     get_status, hide_window, install_certificate, is_certificate_installed, is_osu_running_cmd,
-    load_saved_config, quit_app, set_config, show_window, validate_osu_path, TauriState,
+    load_saved_config, quit_app, set_config, show_window, start_proxy, validate_osu_path,
+    TauriState,
 };
 
 fn init_logging(log_buffer: LogBuffer) {
@@ -61,6 +62,7 @@ pub fn run() {
             validate_osu_path,
             is_osu_running_cmd,
             get_status,
+            start_proxy,
             connect,
             disconnect,
             hide_window,

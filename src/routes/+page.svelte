@@ -10,6 +10,7 @@
     updateConfig,
     detectOsuPath,
     refreshStatus,
+    startProxy,
     connect,
     disconnect,
   } from "$lib/stores/app.svelte";
@@ -51,14 +52,6 @@
 
     return () => clearInterval(interval);
   });
-
-  function handleConnect() {
-    if (isConnected()) {
-      disconnect();
-    } else {
-      connect();
-    }
-  }
 </script>
 
 <main class="min-h-screen bg-[--color-rai-bg] p-6 flex flex-col">
@@ -133,22 +126,48 @@
           </div>
         {/if}
 
-        <Button
-          variant={connected ? "danger" : "primary"}
-          onclick={handleConnect}
-          disabled={!connectable && !connected}
-          loading={connecting || store.isLoading}
-        >
-          {#snippet children()}
-            {#if connected}
-              Disconnect
-            {:else if connecting}
-              Connecting...
-            {:else}
-              Connect & Launch osu!
-            {/if}
-          {/snippet}
-        </Button>
+        <div class="flex gap-3">
+          {#if connected}
+            <Button
+              variant="danger"
+              onclick={() => disconnect()}
+              loading={store.isLoading}
+            >
+              {#snippet children()}
+                Disconnect
+              {/snippet}
+            </Button>
+          {:else}
+            <Button
+              variant="primary"
+              onclick={() => connect()}
+              disabled={!connectable}
+              loading={connecting || store.isLoading}
+            >
+              {#snippet children()}
+                {#if connecting}
+                  Connecting...
+                {:else}
+                  Connect & Launch osu!
+                {/if}
+              {/snippet}
+            </Button>
+            <Button
+              variant="secondary"
+              onclick={() => startProxy()}
+              disabled={connecting || store.isLoading}
+              loading={connecting || store.isLoading}
+            >
+              {#snippet children()}
+                {#if connecting}
+                  Starting...
+                {:else}
+                  Start Proxy Only
+                {/if}
+              {/snippet}
+            </Button>
+          {/if}
+        </div>
       </div>
 
       <!-- Stats Section -->

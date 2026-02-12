@@ -76,6 +76,17 @@ pub fn get_status(state: State<'_, TauriState>) -> AppState {
 }
 
 #[tauri::command]
+pub async fn start_proxy(state: State<'_, TauriState>) -> Result<(), String> {
+    let config = state.config.read().clone();
+
+    let mut proxy_manager = ProxyManager::new(config.proxy.clone());
+    proxy_manager.start().await?;
+    *state.proxy.write() = Some(proxy_manager);
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn connect(state: State<'_, TauriState>) -> Result<(), String> {
     let config = state.config.read().clone();
     let osu_path = get_osu_path(&config)
