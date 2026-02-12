@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+/* rai.moe color scheme */
+@theme {
+  --color-rai-pink: #ff66ab;
+  --color-rai-pink-dark: #cc5289;
+  --color-rai-purple: #6366f1;
+  --color-rai-bg: #0f0f14;
+  --color-rai-card: #1a1a24;
+  --color-rai-border: #2a2a3a;
+  --color-rai-text: #e5e5e5;
+  --color-rai-text-muted: #888;
+}
+
+/* Base styles */
+:root {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--color-rai-text);
+  background-color: var(--color-rai-bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent text selection for UI elements */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Allow text selection in specific areas */
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-rai-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-rai-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-rai-text-muted);
+}
