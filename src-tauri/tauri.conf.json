@@ -1,0 +1,68 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "rai-connect",
+  "version": "0.0.0",
+  "identifier": "moe.rai.connect",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "rai!connect",
+        "label": "main",
+        "width": 480,
+        "height": 640,
+        "minWidth": 400,
+        "minHeight": 500,
+        "resizable": true,
+        "center": true,
+        "decorations": true,
+        "visible": true,
+        "closable": true,
+        "minimizable": true,
+        "maximizable": false
+      }
+    ],
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "tooltip": "rai!connect"
+    },
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' https://assets.ppy.sh https://b.ppy.sh data:; connect-src 'self' https://direct.rai.moe https://api.rai.moe; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    },
+    "publisher": "rai.moe"
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNEMEM2Nzk0RTlGMkU3OTYKUldTVzUvTHBsR2NNUGE0QWVwTmVTYlZINExUM2NqdjNXb1hOZlVkdFpTNFZsTmpueDBmbmI1YmgK",
+      "endpoints": [
+        "https://github.com/rai-osu/connect/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}
