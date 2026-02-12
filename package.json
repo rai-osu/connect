@@ -1,6 +1,6 @@
 {
   "name": "rai-connect",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Local proxy for osu!direct through rai.moe beatmap mirror",
   "type": "module",
   "scripts": {
