@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  /* Font Family */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Colors */
+  --color-background: hsl(0 0% 0%);
+  --color-foreground: hsl(0 0% 98%);
+
+  --color-card: hsl(0 0% 6%);
+  --color-card-foreground: hsl(0 0% 98%);
+
+  --color-popover: hsl(0 0% 10%);
+  --color-popover-foreground: hsl(0 0% 98%);
+
+  --color-primary: hsl(328 83% 70%);
+  --color-primary-foreground: hsl(0 0% 0%);
+
+  --color-secondary: hsl(186 84% 53%);
+  --color-secondary-foreground: hsl(0 0% 0%);
+
+  --color-muted: hsl(0 0% 12%);
+  --color-muted-foreground: hsl(0 0% 50%);
+
+  --color-accent: hsl(0 0% 16%);
+  --color-accent-foreground: hsl(0 0% 98%);
+
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+
+  --color-border: hsl(0 0% 16%);
+  --color-input: hsl(0 0% 8%);
+  --color-ring: hsl(328 83% 70%);
+
+  --radius: 0.5rem;
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+/* Base styles */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-background text-foreground font-sans antialiased selection:bg-primary/20 selection:text-primary;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-border rounded-full hover:bg-muted-foreground/50 transition-colors;
+}
