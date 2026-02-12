@@ -9,7 +9,6 @@
   onMount(() => {
     getLogs();
 
-    // Auto-refresh logs every 500ms when enabled
     refreshInterval = setInterval(() => {
       if (autoRefresh) {
         getLogs();
@@ -41,7 +40,6 @@
   }
 
   function formatTarget(target: string): string {
-    // Shorten long module paths
     const parts = target.split("::");
     if (parts.length > 2) {
       return parts.slice(-2).join("::");

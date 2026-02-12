@@ -57,7 +57,8 @@ pub fn launch_osu(osu_path: &Path, devserver_host: &str) -> Result<(), String> {
     }
 
     let result = Command::new(&exe_path)
-        .arg(format!("-devserver {}", devserver_host))
+        .arg("-devserver")
+        .arg(devserver_host)
         .current_dir(osu_path)
         .spawn();
 

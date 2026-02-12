@@ -4,6 +4,7 @@ use parking_lot::RwLock;
 use tokio::sync::oneshot;
 
 use crate::domain::{AppState, ConnectionStatus, ProxyConfig};
+use crate::infrastructure::{hosts, tls};
 
 pub struct ProxyManager {
     state: Arc<RwLock<AppState>>,
@@ -37,6 +38,30 @@ impl ProxyManager {
             let mut state = self.state.write();
             state.status = ConnectionStatus::Connecting;
             state.last_error = None;
+        }
+
+        // Ensure certificate is installed before starting proxy
+        if !tls::is_certificate_installed() {
+            tracing::info!("Certificate not installed, installing now...");
+            match tls::install_certificate() {
+                Ok(true) => tracing::info!("Certificate installed successfully"),
+                Ok(false) => tracing::info!("Certificate was already installed"),
+                Err(e) => {
+                    tracing::warn!("Failed to auto-install certificate: {}. You may need to install it manually.", e);
+                }
+            }
+        }
+
+        // Ensure hosts file entries exist for *.localhost resolution
+        if !hosts::are_hosts_entries_present() {
+            tracing::info!("Hosts entries not present, adding now...");
+            match hosts::add_hosts_entries() {
+                Ok(true) => tracing::info!("Hosts entries added successfully"),
+                Ok(false) => tracing::info!("Hosts entries were already present"),
+                Err(e) => {
+                    tracing::warn!("Failed to add hosts entries: {}. You may need to add them manually.", e);
+                }
+            }
         }
 
         let (http_tx, http_rx) = oneshot::channel();

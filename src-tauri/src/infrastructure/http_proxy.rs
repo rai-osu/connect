@@ -169,7 +169,6 @@ pub async fn run_https_proxy(
     mut shutdown: oneshot::Receiver<()>,
     ready_tx: Option<oneshot::Sender<()>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Create TLS acceptor with self-signed certificate
     let tls_acceptor = create_tls_acceptor()?;
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
@@ -222,7 +221,6 @@ pub async fn run_https_proxy(
                 let client = Arc::clone(&client);
 
                 tokio::spawn(async move {
-                    // Perform TLS handshake
                     let tls_stream = match tls_acceptor.accept(stream).await {
                         Ok(s) => s,
                         Err(e) => {
@@ -548,7 +546,6 @@ fn inject_supporter_into_bancho_response(body: Bytes) -> Bytes {
 
     let mut modified = false;
 
-    // Process each packet
     for packet in &mut packets {
         if packet.packet_type() == ServerPacketId::UserPrivileges {
             tracing::debug!("Injecting supporter privileges into UserPrivileges packet");
