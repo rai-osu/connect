@@ -5,34 +5,63 @@ Local HTTPS proxy enabling osu!direct through the [rai.moe](https://rai.moe) bea
 ## How It Works
 
 ```mermaid
-flowchart LR
-    osu[osu!] -->|all requests| proxy[rai!connect<br/>:443]
-    proxy -->|beatmaps| mirror[direct.rai.moe]
-    proxy -->|everything else| official[*.ppy.sh]
+flowchart TB
+    subgraph proxy[rai!connect :443]
+        router{Route}
+        inject[Inject Supporter<br/>into UserPrivileges]
+    end
+
+    osu[osu! -devserver localhost] --> proxy
+    router -->|/d/, /thumb/, /preview/| mirror[direct.rai.moe]
+    router -->|c.ppy.sh| inject --> bancho[Bancho]
+    router -->|osu.ppy.sh, a.ppy.sh, etc.| official[Official Servers]
+
+    mirror --> osu
+    bancho --> inject --> osu
+    official --> osu
 ```
 
-Launch osu! with `-devserver localhost` and all traffic routes through the local proxy. Beatmap requests go to the mirror; login, scores, and multiplayer stay on official servers.
+When osu! launches with `-devserver localhost`, the client resolves all `*.ppy.sh` domains to `127.0.0.1`. The proxy intercepts these requests and:
 
-## Features
+1. **Beatmap requests** (`/d/`, `/thumb/`, `/preview/`) → Redirected to `direct.rai.moe`
+2. **Bancho packets** (`c.ppy.sh`) → Forwarded to official servers, but the response is modified to inject supporter privileges
+3. **Everything else** → Passed through to official servers unchanged
 
-- HTTPS proxy with auto-generated TLS certificate
-- Auto-setup (certificate + hosts file) on first run
-- One-click launch button
-- Supporter injection for osu!direct access
+### Supporter Injection
+
+The osu! client receives a `UserPrivileges` packet (ID 71) from Bancho on login containing a privilege bitmask. The proxy parses this binary packet and sets bit 2 (`SUPPORTER` flag), making the client display osu!direct UI without an active subscription. Your actual account privileges on Bancho remain unchanged.
 
 ## Usage
 
 1. Launch rai!connect (accept UAC prompt)
 2. Click **Connect & Launch osu!**
-3. Done
 
 ## FAQ
 
-**Is this safe?** Yes. Only beatmap requests are redirected. Gameplay traffic is untouched.
+### Is this safe?
 
-**Will I get banned?** No. This doesn't modify the game client.
+Yes. The proxy only intercepts network traffic locally—no game files are modified. Your scores, multiplayer sessions, and account data all flow through official servers. The only modifications are:
+- Beatmap download URLs are rewritten to use the mirror
+- The supporter bit is set in your local privilege packet (server-side privileges are unaffected)
 
-**Why admin privileges?** Port 443, hosts file, and certificate installation require elevation.
+### Will I get banned?
+
+No. From Bancho's perspective, you're a normal client making normal requests. The `-devserver` flag is an official osu! feature intended for tournament/development servers. The supporter injection only affects your local client's UI state.
+
+### Why does it need admin privileges?
+
+Three reasons:
+- **Port 443**: Binding to ports below 1024 requires elevation on Windows
+- **Hosts file**: The proxy adds entries for `*.localhost` subdomains since Windows doesn't resolve them by default
+- **Certificate store**: Installing the self-signed TLS certificate to the trusted root store requires admin
+
+### Does this work with osu!lazer?
+
+No. Lazer has native beatmap downloading and doesn't use the legacy osu!direct system.
+
+### What happens to my supporter status if I already have it?
+
+Nothing changes. The injection performs a bitwise OR, so existing supporters keep all their privileges.
 
 ## License
 
