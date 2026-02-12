@@ -17,7 +17,15 @@ export interface AppConfig {
   start_at_boot: boolean;
   minimize_to_tray: boolean;
   start_minimized: boolean;
+  debug_logging: boolean;
   proxy: ProxyConfig;
+}
+
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  target: string;
+  message: string;
 }
 
 export interface AppState {
@@ -33,6 +41,7 @@ export const defaultConfig: AppConfig = {
   start_at_boot: false,
   minimize_to_tray: true,
   start_minimized: false,
+  debug_logging: false,
   proxy: {
     http_port: 8080,
     bancho_port: 13381,

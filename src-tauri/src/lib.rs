@@ -10,24 +10,29 @@ use tauri::{
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use infrastructure::logging::{LogBuffer, LogCaptureLayer};
 use interface::{
-    connect, detect_osu, disconnect, get_config, get_status, hide_window, is_osu_running_cmd,
-    load_saved_config, quit_app, set_config, show_window, validate_osu_path, TauriState,
+    clear_logs, connect, detect_osu, disconnect, get_config, get_logs, get_status, hide_window,
+    is_osu_running_cmd, load_saved_config, quit_app, set_config, show_window, validate_osu_path,
+    TauriState,
 };
 
-fn init_logging() {
+fn init_logging(log_buffer: LogBuffer) {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "rai_connect=debug,info".into()),
         )
         .with(tracing_subscriber::fmt::layer())
+        .with(LogCaptureLayer::new(log_buffer))
         .init();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    init_logging();
+    // Create log buffer before initializing tracing so we capture boot logs
+    let log_buffer = LogBuffer::new();
+    init_logging(log_buffer.clone());
 
     tracing::info!("Starting rai!connect v{}", env!("CARGO_PKG_VERSION"));
 
@@ -39,8 +44,8 @@ pub fn run() {
         ))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .setup(|app| {
-            let state = TauriState::default();
+        .setup(move |app| {
+            let state = TauriState::new(log_buffer);
             let config = infrastructure::storage::load_config(app.handle());
             *state.config.write() = config.clone();
             app.manage(state);
@@ -61,6 +66,8 @@ pub fn run() {
             hide_window,
             show_window,
             quit_app,
+            get_logs,
+            clear_logs,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

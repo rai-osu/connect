@@ -17,8 +17,11 @@
   import StatsCard from "$lib/components/StatsCard.svelte";
   import Button from "$lib/components/Button.svelte";
   import Settings from "$lib/components/Settings.svelte";
+  import LogViewer from "$lib/components/LogViewer.svelte";
+  import { FileText, Settings as SettingsIcon } from "lucide-svelte";
 
   let showSettings = $state(false);
+  let showLogs = $state(false);
 
   // Local derived state from getter functions (allowed in components)
   const connected = $derived(isConnected());
@@ -68,31 +71,26 @@
         <p class="text-xs text-[--color-rai-text-muted]">osu!direct mirror proxy</p>
       </div>
     </div>
-    <button
-      onclick={() => (showSettings = !showSettings)}
-      class="p-2 rounded-lg hover:bg-[--color-rai-card] transition-colors"
-      aria-label="Settings"
-    >
-      <svg
-        class="w-6 h-6 text-[--color-rai-text-muted]"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
+    <div class="flex items-center gap-2">
+      {#if store.config.debug_logging}
+        <button
+          onclick={() => { showLogs = !showLogs; showSettings = false; }}
+          class="p-2 rounded-lg hover:bg-[--color-rai-card] transition-colors"
+          class:bg-[--color-rai-card]={showLogs}
+          aria-label="Logs"
+        >
+          <FileText class="w-6 h-6 text-[--color-rai-text-muted]" />
+        </button>
+      {/if}
+      <button
+        onclick={() => { showSettings = !showSettings; showLogs = false; }}
+        class="p-2 rounded-lg hover:bg-[--color-rai-card] transition-colors"
+        class:bg-[--color-rai-card]={showSettings}
+        aria-label="Settings"
       >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-        />
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-        />
-      </svg>
-    </button>
+        <SettingsIcon class="w-6 h-6 text-[--color-rai-text-muted]" />
+      </button>
+    </div>
   </header>
 
   {#if showSettings}
@@ -100,6 +98,11 @@
     <div class="mb-8 p-6 bg-[--color-rai-card] rounded-xl border border-[--color-rai-border]">
       <h2 class="text-lg font-semibold text-[--color-rai-text] mb-4">Settings</h2>
       <Settings />
+    </div>
+  {:else if showLogs}
+    <!-- Logs Panel -->
+    <div class="flex-1 mb-8 p-6 bg-[--color-rai-card] rounded-xl border border-[--color-rai-border] flex flex-col min-h-[400px]">
+      <LogViewer />
     </div>
   {:else}
     <!-- Main Content -->
@@ -163,19 +166,6 @@
           />
         </div>
       {/if}
-
-      <!-- Info Section -->
-      <div class="mt-auto">
-        <div class="p-4 bg-[--color-rai-card]/50 rounded-lg border border-[--color-rai-border]/50">
-          <h3 class="text-sm font-medium text-[--color-rai-text] mb-2">How it works</h3>
-          <ul class="text-xs text-[--color-rai-text-muted] space-y-1">
-            <li>• Redirects osu!direct requests to rai.moe mirror</li>
-            <li>• All other traffic goes to official osu! servers</li>
-            <li>• Enables osu!direct features for all users</li>
-            <li>• Your gameplay and scores are unaffected</li>
-          </ul>
-        </div>
-      </div>
     </div>
   {/if}
 

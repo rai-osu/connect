@@ -2,11 +2,13 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AppConfig {
     pub osu_path: Option<PathBuf>,
     pub start_at_boot: bool,
     pub minimize_to_tray: bool,
     pub start_minimized: bool,
+    pub debug_logging: bool,
     pub proxy: ProxyConfig,
 }
 
@@ -17,6 +19,7 @@ impl Default for AppConfig {
             start_at_boot: false,
             minimize_to_tray: true,
             start_minimized: false,
+            debug_logging: false,
             proxy: ProxyConfig::default(),
         }
     }

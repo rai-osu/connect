@@ -8,18 +8,21 @@ use crate::application::{
     ProxyManager,
 };
 use crate::domain::{AppConfig, AppState};
+use crate::infrastructure::logging::{LogBuffer, LogEntry};
 use crate::infrastructure::storage::{load_config, save_config};
 
 pub struct TauriState {
     pub config: RwLock<AppConfig>,
     pub proxy: RwLock<Option<ProxyManager>>,
+    pub logs: LogBuffer,
 }
 
-impl Default for TauriState {
-    fn default() -> Self {
+impl TauriState {
+    pub fn new(logs: LogBuffer) -> Self {
         Self {
             config: RwLock::new(AppConfig::default()),
             proxy: RwLock::new(None),
+            logs,
         }
     }
 }
@@ -114,4 +117,17 @@ pub fn show_window(app: AppHandle) {
 #[tauri::command]
 pub fn quit_app(app: AppHandle) {
     app.exit(0);
+}
+
+#[tauri::command]
+pub fn get_logs(state: State<'_, TauriState>, count: Option<usize>) -> Vec<LogEntry> {
+    match count {
+        Some(n) => state.logs.get_recent(n),
+        None => state.logs.get_all(),
+    }
+}
+
+#[tauri::command]
+pub fn clear_logs(state: State<'_, TauriState>) {
+    state.logs.clear();
 }

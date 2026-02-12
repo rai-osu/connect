@@ -1,11 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppConfig, AppState } from "$lib/types";
+import type { AppConfig, AppState, LogEntry } from "$lib/types";
 import { defaultConfig, defaultState } from "$lib/types";
 
 // Use object wrapper to allow property mutation instead of reassignment
 export const store = $state({
   config: defaultConfig as AppConfig,
   appState: defaultState as AppState,
+  logs: [] as LogEntry[],
   isLoading: false
 });
 
@@ -125,5 +126,25 @@ export async function checkOsuRunning(): Promise<boolean> {
   } catch (e) {
     console.error("Failed to check osu! status:", e);
     return false;
+  }
+}
+
+export async function getLogs(): Promise<LogEntry[]> {
+  try {
+    const logs = await invoke<LogEntry[]>("get_logs", { count: null });
+    store.logs = logs;
+    return logs;
+  } catch (e) {
+    console.error("Failed to get logs:", e);
+    return [];
+  }
+}
+
+export async function clearLogs(): Promise<void> {
+  try {
+    await invoke("clear_logs");
+    store.logs = [];
+  } catch (e) {
+    console.error("Failed to clear logs:", e);
   }
 }

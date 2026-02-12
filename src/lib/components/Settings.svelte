@@ -1,6 +1,7 @@
 <script lang="ts">
   import { store, updateConfig, detectOsuPath, validateOsuPath, isConnected } from "$lib/stores/app.svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
+  import { Info } from "lucide-svelte";
   import Button from "./Button.svelte";
 
   let isDetecting = $state(false);
@@ -27,7 +28,7 @@
     }
   }
 
-  async function handleToggle(key: "start_at_boot" | "minimize_to_tray" | "start_minimized") {
+  async function handleToggle(key: "start_at_boot" | "minimize_to_tray" | "start_minimized" | "debug_logging") {
     await updateConfig(key, !store.config[key]);
   }
 
@@ -133,6 +134,23 @@
       </span>
     </label>
 
+    <label class="flex items-center gap-3 cursor-pointer group">
+      <input
+        type="checkbox"
+        checked={store.config.debug_logging}
+        onchange={() => handleToggle("debug_logging")}
+        class="w-5 h-5 rounded bg-[--color-rai-card] border-[--color-rai-border] text-[--color-rai-pink] focus:ring-[--color-rai-pink] focus:ring-offset-0"
+      />
+      <div class="flex flex-col">
+        <span class="text-sm text-[--color-rai-text] group-hover:text-[--color-rai-pink] transition-colors">
+          Show debug logs
+        </span>
+        <span class="text-xs text-[--color-rai-text-muted]">
+          View internal logs for troubleshooting
+        </span>
+      </div>
+    </label>
+
     <!-- Inject Supporter -->
     <div class="pt-4 border-t border-[--color-rai-border]">
       <label class="flex items-center gap-3 cursor-pointer group">
@@ -164,19 +182,7 @@
 
     {#if isConnected()}
       <div class="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-2">
-        <svg
-          class="w-4 h-4 text-yellow-500"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
+        <Info class="w-4 h-4 text-yellow-500" />
         <p class="text-xs text-yellow-200">
           Reconnect for changes to take effect.
         </p>
