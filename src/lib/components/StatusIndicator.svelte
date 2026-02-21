@@ -44,7 +44,7 @@
           class="w-2.5 h-2.5 rounded-full {statusConfig.color}"
           class:animate-pulse={statusConfig.pulse}
         ></div>
-        {#if statusConfig.pulse || status === 'connected'}
+        {#if statusConfig.pulse}
           <div
             class="absolute inset-0 w-2.5 h-2.5 rounded-full {statusConfig.color} animate-ping opacity-75"
           ></div>
