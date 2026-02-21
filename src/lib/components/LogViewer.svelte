@@ -108,7 +108,7 @@
 
   <!-- Log entries -->
   <div
-    class="flex-1 overflow-auto bg-background border border-border rounded-lg p-3 font-mono text-xs"
+    class="flex-1 overflow-auto bg-background border border-border rounded-lg p-3 font-mono text-xs selectable"
   >
     {#if store.logs.length === 0}
       <div class="text-muted-foreground text-center py-8">
