@@ -54,11 +54,15 @@ fn store_key_in_keyring(
     key_der_bytes: &[u8],
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let entry = get_key_entry()?;
-    // Encode as base64 since keyring stores strings
     let encoded = BASE64.encode(key_der_bytes);
-    entry
-        .set_password(&encoded)
-        .map_err(|e| format!("Failed to store key in keyring: {}", e))?;
+    tracing::debug!(
+        "Storing key in keyring (service={}, account={}, size={} bytes)",
+        KEYRING_SERVICE, KEYRING_KEY_ACCOUNT, encoded.len()
+    );
+    entry.set_password(&encoded).map_err(|e| {
+        format!("Failed to store key in keyring (service={}, account={}): {}",
+            KEYRING_SERVICE, KEYRING_KEY_ACCOUNT, e)
+    })?;
     tracing::info!("Private key stored securely in system keychain");
     Ok(())
 }
@@ -66,11 +70,15 @@ fn store_key_in_keyring(
 /// Retrieves the private key from the system keychain.
 fn load_key_from_keyring() -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
     let entry = get_key_entry()?;
-    let encoded = entry
-        .get_password()
-        .map_err(|e| format!("Failed to retrieve key from keyring: {}", e))?;
-    let key_bytes = BASE64
-        .decode(&encoded)
+    tracing::debug!(
+        "Loading key from keyring (service={}, account={})",
+        KEYRING_SERVICE, KEYRING_KEY_ACCOUNT
+    );
+    let encoded = entry.get_password().map_err(|e| {
+        format!("Failed to retrieve key from keyring (service={}, account={}): {}",
+            KEYRING_SERVICE, KEYRING_KEY_ACCOUNT, e)
+    })?;
+    let key_bytes = BASE64.decode(&encoded)
         .map_err(|e| format!("Failed to decode key from keyring: {}", e))?;
     tracing::debug!("Private key loaded from system keychain");
     Ok(key_bytes)
@@ -215,18 +223,25 @@ pub fn get_or_create_cert() -> Result<
     // Check if cert exists on disk and key exists in keyring
     if cert_path.exists() {
         match load_cert_from_disk() {
-            Ok(result) => return Ok(result),
+            Ok(result) => {
+                tracing::debug!("Successfully loaded certificate and key from storage");
+                return Ok(result);
+            }
             Err(e) => {
+                // Common causes: first run after keyring migration, admin vs normal user context
                 tracing::warn!(
-                    "Failed to load existing certificate/key, regenerating: {}",
+                    "Certificate exists but key not found in secure storage ({}). Regenerating.",
                     e
                 );
-                // Clean up any partial state
                 let _ = delete_key_from_keyring();
+                if let Err(e) = std::fs::remove_file(&cert_path) {
+                    tracing::debug!("Could not remove old certificate file: {}", e);
+                }
             }
         }
     }
 
+    tracing::info!("Generating new TLS certificate and key pair");
     generate_and_save_cert()
 }
 
