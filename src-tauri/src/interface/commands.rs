@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use parking_lot::RwLock;
-use tauri::{AppHandle, Manager, State};
+use tauri::{tray::TrayIconId, AppHandle, Manager, State};
 
 use crate::application::{
     detect_osu_path, get_osu_path, is_osu_running, is_valid_osu_installation, launch_osu,
@@ -175,4 +175,24 @@ pub fn get_certificate_path() -> Result<String, String> {
     tls::get_cert_path()
         .map(|p| p.display().to_string())
         .map_err(|e| e.to_string())
+}
+
+/// Update the system tray tooltip to reflect the current connection status.
+/// Called by the frontend when the connection status changes.
+#[tauri::command]
+pub fn update_tray_status(app: AppHandle, status: String, downloads: Option<u64>) {
+    let tray_id: TrayIconId = "main".into();
+    if let Some(tray) = app.tray_by_id(&tray_id) {
+        let tooltip = match (status.as_str(), downloads) {
+            ("connected", Some(count)) if count > 0 => {
+                format!("rai!connect - Connected ({} downloads)", count)
+            }
+            ("connected", _) => "rai!connect - Connected".to_string(),
+            ("connecting", _) => "rai!connect - Connecting...".to_string(),
+            ("disconnected", _) => "rai!connect - Disconnected".to_string(),
+            ("error", _) => "rai!connect - Error".to_string(),
+            _ => format!("rai!connect - {}", status),
+        };
+        let _ = tray.set_tooltip(Some(&tooltip));
+    }
 }

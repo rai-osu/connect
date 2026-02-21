@@ -14,8 +14,8 @@ use infrastructure::logging::{LogBuffer, LogCaptureLayer};
 use interface::{
     clear_logs, connect, detect_osu, disconnect, get_certificate_path, get_config,
     get_latest_log_id, get_logs, get_logs_since, get_status, hide_window, install_certificate,
-    is_certificate_installed, is_osu_running_cmd, load_saved_config, quit_app, set_config, show_window, start_proxy, validate_osu_path,
-    TauriState,
+    is_certificate_installed, is_osu_running_cmd, load_saved_config, quit_app, set_config,
+    show_window, start_proxy, update_tray_status, validate_osu_path, TauriState,
 };
 
 fn init_logging(log_buffer: LogBuffer) {
@@ -92,6 +92,7 @@ pub fn run() {
             is_certificate_installed,
             install_certificate,
             get_certificate_path,
+            update_tray_status,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -124,10 +125,10 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
-    let _tray = TrayIconBuilder::new()
+    let _tray = TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().unwrap().clone())
         .menu(&menu)
-        .tooltip("rai!connect")
+        .tooltip("rai!connect - Disconnected")
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => {
                 if let Some(window) = app.get_webview_window("main") {
