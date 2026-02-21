@@ -18,17 +18,14 @@ pub fn create_desktop_shortcut() -> Result<PathBuf, String> {
 }
 
 pub fn shortcut_exists() -> bool {
-    get_shortcut_path()
-        .map(|p| p.exists())
-        .unwrap_or(false)
+    get_shortcut_path().map(|p| p.exists()).unwrap_or(false)
 }
 
 pub fn remove_desktop_shortcut() -> Result<(), String> {
     let path = get_shortcut_path().ok_or("Could not determine shortcut path")?;
 
     if path.exists() {
-        std::fs::remove_file(&path)
-            .map_err(|e| format!("Failed to remove shortcut: {}", e))?;
+        std::fs::remove_file(&path).map_err(|e| format!("Failed to remove shortcut: {}", e))?;
     }
 
     Ok(())
@@ -65,8 +62,8 @@ fn create_windows_shortcut() -> Result<PathBuf, String> {
 
     let icon_path = exe_path.clone();
 
-    let mut sl = ShellLink::new(&exe_path)
-        .map_err(|e| format!("Failed to create shortcut: {}", e))?;
+    let mut sl =
+        ShellLink::new(&exe_path).map_err(|e| format!("Failed to create shortcut: {}", e))?;
 
     sl.set_arguments(Some("--launch-osu".to_string()));
     sl.set_icon_location(Some(icon_path.to_string_lossy().to_string()));
