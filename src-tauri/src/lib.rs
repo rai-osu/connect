@@ -60,6 +60,14 @@ pub fn run() {
             *state.config.write() = config.clone();
             app.manage(state);
             setup_tray(app)?;
+
+            let has_minimized_flag = std::env::args().any(|a| a == "--minimized");
+            if config.start_minimized || has_minimized_flag {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
+
             tracing::info!("Application setup complete");
             Ok(())
         })
