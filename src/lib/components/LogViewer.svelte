@@ -1,21 +1,40 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { store, getLogs, clearLogs } from "$lib/stores/app.svelte";
+  import { store, getLogs, getLogsSince, getLastLogId, clearLogs } from "$lib/stores/app.svelte";
   import Button from "./Button.svelte";
 
   let autoRefresh = $state(true);
+  let isVisible = $state(true);
   let refreshInterval: ReturnType<typeof setInterval> | null = null;
+  const POLL_INTERVAL_MS = 1000;
+
+  function handleVisibilityChange() {
+    isVisible = document.visibilityState === "visible";
+  }
+
+  async function fetchLogs() {
+    const lastId = getLastLogId();
+    if (lastId === 0) {
+      await getLogs();
+    } else {
+      await getLogsSince(lastId);
+    }
+  }
 
   onMount(() => {
     getLogs();
 
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    isVisible = document.visibilityState === "visible";
+
     refreshInterval = setInterval(() => {
-      if (autoRefresh) {
-        getLogs();
+      if (autoRefresh && isVisible) {
+        fetchLogs();
       }
-    }, 500);
+    }, POLL_INTERVAL_MS);
 
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (refreshInterval) {
         clearInterval(refreshInterval);
       }
@@ -46,6 +65,14 @@
     }
     return target;
   }
+
+  function handleClearLogs() {
+    clearLogs();
+  }
+
+  function handleRefresh() {
+    getLogs();
+  }
 </script>
 
 <div class="flex flex-col h-full">
@@ -66,12 +93,12 @@
         />
         Auto-refresh
       </label>
-      <Button variant="outline" size="sm" onclick={() => getLogs()}>
+      <Button variant="outline" size="sm" onclick={handleRefresh}>
         {#snippet children()}
           Refresh
         {/snippet}
       </Button>
-      <Button variant="destructive" size="sm" onclick={() => clearLogs()}>
+      <Button variant="destructive" size="sm" onclick={handleClearLogs}>
         {#snippet children()}
           Clear
         {/snippet}
@@ -89,7 +116,7 @@
       </div>
     {:else}
       <div class="space-y-1">
-        {#each store.logs as log}
+        {#each store.logs as log (log.id)}
           <div class="flex gap-2 hover:bg-white/5 px-1 rounded transition-colors">
             <span class="text-muted-foreground shrink-0">{log.timestamp}</span>
             <span class={`shrink-0 w-12 font-bold ${getLevelColor(log.level)}`}>{log.level}</span>
