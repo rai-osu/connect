@@ -3,6 +3,7 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { Info } from "lucide-svelte";
   import Button from "./Button.svelte";
+  import Tooltip from "./Tooltip.svelte";
 
   let isDetecting = $state(false);
   let pathInput = $state(store.config.osu_path ?? "");
@@ -74,9 +75,16 @@
 
 <div class="space-y-6">
   <div class="space-y-2">
-    <label for="osu-path" class="block text-sm font-medium text-foreground">
-      osu! Installation Path
-    </label>
+    <div class="flex items-center gap-2">
+      <label for="osu-path" class="block text-sm font-medium text-foreground">
+        osu! Installation Path
+      </label>
+      <Tooltip text="The folder containing osu!.exe. Usually located at C:\osu! or in your Program Files." position="right">
+        {#snippet children()}
+          <Info class="w-4 h-4 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
+        {/snippet}
+      </Tooltip>
+    </div>
     <div class="flex gap-2">
       <input
         id="osu-path"
@@ -86,16 +94,22 @@
         placeholder="C:\osu!"
         class="flex-1 px-3 py-2 bg-input border border-input rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-all"
       />
-      <Button variant="outline" onclick={handleDetect} loading={isDetecting}>
+      <Tooltip text="Automatically find your osu! installation" position="top">
         {#snippet children()}
-          Detect
+          <Button variant="outline" onclick={handleDetect} loading={isDetecting}>
+            {#snippet children()}
+              Detect
+            {/snippet}
+          </Button>
         {/snippet}
-      </Button>
+      </Tooltip>
     </div>
     {#if store.config.osu_path}
-      <p class="text-xs text-success">✓ Valid osu! installation found</p>
+      <p class="text-xs text-success">Valid osu! installation found</p>
     {:else if pathInput}
-      <p class="text-xs text-destructive">✗ osu! not found at this path</p>
+      <p class="text-xs text-destructive">osu! not found at this path</p>
+    {:else}
+      <p class="text-xs text-muted-foreground">Enter the path to your osu! folder or click Detect</p>
     {/if}
   </div>
 
@@ -107,9 +121,14 @@
         onchange={() => handleToggle("start_at_boot")}
         class="w-4 h-4 rounded border-input bg-input text-primary accent-primary focus:ring-primary focus:ring-offset-background"
       />
-      <span class="text-sm text-foreground group-hover:text-primary transition-colors">
-        Start at system boot
-      </span>
+      <div class="flex flex-col">
+        <span class="text-sm text-foreground group-hover:text-primary transition-colors">
+          Start at system boot
+        </span>
+        <span class="text-xs text-muted-foreground">
+          Launch rai!connect when Windows starts
+        </span>
+      </div>
     </label>
 
     <label class="flex items-center gap-3 cursor-pointer group">
@@ -119,9 +138,14 @@
         onchange={() => handleToggle("minimize_to_tray")}
         class="w-4 h-4 rounded border-input bg-input text-primary accent-primary focus:ring-primary focus:ring-offset-background"
       />
-      <span class="text-sm text-foreground group-hover:text-primary transition-colors">
-        Minimize to tray on close
-      </span>
+      <div class="flex flex-col">
+        <span class="text-sm text-foreground group-hover:text-primary transition-colors">
+          Minimize to tray on close
+        </span>
+        <span class="text-xs text-muted-foreground">
+          Keep the app running in background when closing the window
+        </span>
+      </div>
     </label>
 
     <label class="flex items-center gap-3 cursor-pointer group">
@@ -131,9 +155,14 @@
         onchange={() => handleToggle("start_minimized")}
         class="w-4 h-4 rounded border-input bg-input text-primary accent-primary focus:ring-primary focus:ring-offset-background"
       />
-      <span class="text-sm text-foreground group-hover:text-primary transition-colors">
-        Start minimized
-      </span>
+      <div class="flex flex-col">
+        <span class="text-sm text-foreground group-hover:text-primary transition-colors">
+          Start minimized
+        </span>
+        <span class="text-xs text-muted-foreground">
+          Hide the window when the app launches
+        </span>
+      </div>
     </label>
 
     <label class="flex items-center gap-3 cursor-pointer group">
@@ -154,31 +183,40 @@
     </label>
 
     <div class="pt-4 border-t border-border">
-      <label class="flex items-center gap-3 cursor-pointer group">
+      <div class="flex items-start gap-3 cursor-pointer group">
         <input
           type="checkbox"
           checked={store.config.proxy.inject_supporter}
-          onchange={(e) => {
-            const checked = e.currentTarget.checked;
-            if (checked) {
-              e.currentTarget.checked = false; // Revert visual immediately
+          onclick={(e) => {
+            if (!store.config.proxy.inject_supporter) {
+              e.preventDefault();
               showSupporterConfirm = true;
-            } else {
+            }
+          }}
+          onchange={() => {
+            if (store.config.proxy.inject_supporter) {
               const newProxy = { ...store.config.proxy, inject_supporter: false };
               updateConfig("proxy", newProxy);
             }
           }}
-          class="w-4 h-4 rounded border-input bg-input text-primary accent-primary focus:ring-primary focus:ring-offset-background"
+          class="w-4 h-4 mt-0.5 rounded border-input bg-input text-primary accent-primary focus:ring-primary focus:ring-offset-background"
         />
-        <div class="flex flex-col">
-          <span class="text-sm text-foreground group-hover:text-primary transition-colors">
-            Inject Supporter Tag
-          </span>
+        <div class="flex flex-col flex-1">
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-foreground group-hover:text-primary transition-colors">
+              Inject Supporter Tag
+            </span>
+            <Tooltip text="This modifies the API response to show supporter status. It does not actually give you osu!supporter features on the official servers." position="right">
+              {#snippet children()}
+                <Info class="w-4 h-4 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
+              {/snippet}
+            </Tooltip>
+          </div>
           <span class="text-xs text-muted-foreground">
-            Unlocks osu!direct in-game.
+            Shows the supporter heart icon in-game without requiring osu!supporter. This is purely cosmetic and unlocks osu!direct.
           </span>
         </div>
-      </label>
+      </div>
     </div>
 
     {#if isConnected()}
