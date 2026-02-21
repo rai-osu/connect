@@ -233,11 +233,17 @@ export async function getLogs(): Promise<LogEntry[]> {
   }
 }
 
+const MAX_LOG_ENTRIES = 1000;
+
 export async function getLogsSince(lastId: number): Promise<LogEntry[]> {
   try {
     const newLogs = await invoke<LogEntry[]>("get_logs_since", { lastId });
     if (newLogs.length > 0) {
-      store.logs = [...store.logs, ...newLogs];
+      const combined = [...store.logs, ...newLogs];
+      // Trim to max size, keeping most recent entries
+      store.logs = combined.length > MAX_LOG_ENTRIES
+        ? combined.slice(-MAX_LOG_ENTRIES)
+        : combined;
     }
     return newLogs;
   } catch {

@@ -230,7 +230,8 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 let state = app.state::<TauriState>();
                 let proxy = state.proxy.write().take();
                 if let Some(mut pm) = proxy {
-                    tauri::async_runtime::spawn(async move {
+                    // Use block_on to ensure proxy cleanup completes before exiting
+                    tauri::async_runtime::block_on(async move {
                         let _ = pm.stop().await;
                     });
                 }

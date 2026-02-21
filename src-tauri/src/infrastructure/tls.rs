@@ -292,8 +292,12 @@ pub fn install_certificate() -> Result<bool, Box<dyn std::error::Error + Send + 
     // Install certificate using certutil (Windows)
     #[cfg(target_os = "windows")]
     {
+        let cert_path_str = cert_path
+            .to_str()
+            .ok_or("Certificate path contains invalid UTF-8 characters")?;
+
         let output = std::process::Command::new("certutil")
-            .args(["-addstore", "-user", "Root", cert_path.to_str().unwrap()])
+            .args(["-addstore", "-user", "Root", cert_path_str])
             .output()?;
 
         if output.status.success() {

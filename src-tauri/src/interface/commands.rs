@@ -77,6 +77,11 @@ pub fn get_status(state: State<'_, TauriState>) -> AppState {
 
 #[tauri::command]
 pub async fn start_proxy(state: State<'_, TauriState>) -> Result<(), String> {
+    // Check if proxy already exists to prevent orphaned proxies
+    if state.proxy.read().is_some() {
+        return Ok(());
+    }
+
     let config = state.config.read().clone();
 
     let mut proxy_manager = ProxyManager::new(config.proxy.clone());
@@ -92,9 +97,12 @@ pub async fn connect(state: State<'_, TauriState>) -> Result<(), String> {
     let osu_path = get_osu_path(&config)
         .ok_or("osu! installation not found. Please configure the path in settings.")?;
 
-    let mut proxy_manager = ProxyManager::new(config.proxy.clone());
-    proxy_manager.start().await?;
-    *state.proxy.write() = Some(proxy_manager);
+    // Check if proxy already exists to prevent orphaned proxies
+    if state.proxy.read().is_none() {
+        let mut proxy_manager = ProxyManager::new(config.proxy.clone());
+        proxy_manager.start().await?;
+        *state.proxy.write() = Some(proxy_manager);
+    }
 
     launch_osu(&osu_path, "localhost")?;
     Ok(())
