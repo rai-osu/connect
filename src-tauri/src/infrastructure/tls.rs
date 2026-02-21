@@ -11,7 +11,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use keyring::Entry;
 use rcgen::{CertificateParams, DnType, KeyPair, SanType};
 use rustls::crypto::ring::default_provider;
@@ -54,14 +53,13 @@ fn store_key_in_keyring(
     key_der_bytes: &[u8],
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let entry = get_key_entry()?;
-    let encoded = BASE64.encode(key_der_bytes);
     tracing::debug!(
         "Storing key in keyring (service={}, account={}, size={} bytes)",
         KEYRING_SERVICE,
         KEYRING_KEY_ACCOUNT,
-        encoded.len()
+        key_der_bytes.len()
     );
-    entry.set_password(&encoded).map_err(|e| {
+    entry.set_secret(key_der_bytes).map_err(|e| {
         format!(
             "Failed to store key in keyring (service={}, account={}): {}",
             KEYRING_SERVICE, KEYRING_KEY_ACCOUNT, e
@@ -79,15 +77,12 @@ fn load_key_from_keyring() -> Result<Vec<u8>, Box<dyn std::error::Error + Send +
         KEYRING_SERVICE,
         KEYRING_KEY_ACCOUNT
     );
-    let encoded = entry.get_password().map_err(|e| {
+    let key_bytes = entry.get_secret().map_err(|e| {
         format!(
             "Failed to retrieve key from keyring (service={}, account={}): {}",
             KEYRING_SERVICE, KEYRING_KEY_ACCOUNT, e
         )
     })?;
-    let key_bytes = BASE64
-        .decode(&encoded)
-        .map_err(|e| format!("Failed to decode key from keyring: {}", e))?;
     tracing::debug!("Private key loaded from system keychain");
     Ok(key_bytes)
 }

@@ -3109,7 +3109,6 @@ name = "rai-connect"
 version = "1.2.0"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
  "bytes",
  "chrono",
  "dirs 5.0.1",

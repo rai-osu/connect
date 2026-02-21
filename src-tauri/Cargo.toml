@@ -60,7 +60,6 @@ dirs = "5"
 
 # Secure key storage (platform-specific: linux-native, windows-native, apple-native)
 keyring = { version = "3.6", features = ["linux-native", "windows-native", "apple-native"] }
-base64 = "0.22"
 
 [target.'cfg(windows)'.dependencies]
 mslnk = "0.1"
