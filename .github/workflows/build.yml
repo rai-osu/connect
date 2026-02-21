@@ -17,6 +17,8 @@ jobs:
   build:
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -65,6 +67,7 @@ jobs:
         run: pnpm install
 
       - name: Build Tauri app
+        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -77,3 +80,17 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
           updaterJsonPreferNsis: true
+
+      - name: Parse artifact paths
+        id: artifacts
+        shell: bash
+        run: |
+          paths=$(node -p "JSON.parse(process.argv[1]).join('\n')" '${{ steps.tauri.outputs.artifactPaths }}')
+          echo "paths<<EOF" >> $GITHUB_OUTPUT
+          echo "$paths" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate build attestations
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.artifacts.outputs.paths }}
