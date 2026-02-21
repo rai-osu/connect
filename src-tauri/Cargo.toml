@@ -1,6 +1,6 @@
 [package]
 name = "rai-connect"
-version = "1.0.0"
+version = "1.1.0"
 description = "Local proxy for osu!direct through rai.moe beatmap mirror"
 authors = ["rai.moe"]
 license = "MIT"
