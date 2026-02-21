@@ -2,15 +2,27 @@
 //!
 //! This module provides TLS support for the HTTPS proxy, including
 //! runtime generation of self-signed certificates for localhost.
+//!
+//! Private keys are stored securely using the system keychain:
+//! - Windows: Windows Credential Manager
+//! - macOS: Keychain
+//! - Linux: Secret Service (GNOME Keyring, KWallet, etc.)
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use keyring::Entry;
 use rcgen::{CertificateParams, DnType, KeyPair, SanType};
 use rustls::crypto::ring::default_provider;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::ServerConfig;
 use tokio_rustls::TlsAcceptor;
+
+/// Service name for keyring storage.
+const KEYRING_SERVICE: &str = "rai-connect";
+/// Account name for the TLS private key.
+const KEYRING_KEY_ACCOUNT: &str = "localhost-tls-key";
 
 /// Returns the directory where certificate files are stored.
 fn get_cert_dir() -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
@@ -25,12 +37,89 @@ pub fn get_cert_path() -> Result<PathBuf, Box<dyn std::error::Error + Send + Syn
     Ok(get_cert_dir()?.join("localhost.cer"))
 }
 
-/// Returns the path where the private key should be stored.
-fn get_key_path() -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
+/// Returns the path where the old plaintext private key was stored.
+/// Used for migration purposes only.
+fn get_legacy_key_path() -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
     Ok(get_cert_dir()?.join("localhost.key"))
 }
 
-/// Generates a new certificate and key pair, saving both to disk.
+/// Gets the keyring entry for the private key.
+fn get_key_entry() -> Result<Entry, Box<dyn std::error::Error + Send + Sync>> {
+    Entry::new(KEYRING_SERVICE, KEYRING_KEY_ACCOUNT)
+        .map_err(|e| format!("Failed to create keyring entry: {}", e).into())
+}
+
+/// Stores the private key securely in the system keychain.
+fn store_key_in_keyring(
+    key_der_bytes: &[u8],
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let entry = get_key_entry()?;
+    // Encode as base64 since keyring stores strings
+    let encoded = BASE64.encode(key_der_bytes);
+    entry
+        .set_password(&encoded)
+        .map_err(|e| format!("Failed to store key in keyring: {}", e))?;
+    tracing::info!("Private key stored securely in system keychain");
+    Ok(())
+}
+
+/// Retrieves the private key from the system keychain.
+fn load_key_from_keyring() -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+    let entry = get_key_entry()?;
+    let encoded = entry
+        .get_password()
+        .map_err(|e| format!("Failed to retrieve key from keyring: {}", e))?;
+    let key_bytes = BASE64
+        .decode(&encoded)
+        .map_err(|e| format!("Failed to decode key from keyring: {}", e))?;
+    tracing::debug!("Private key loaded from system keychain");
+    Ok(key_bytes)
+}
+
+/// Deletes the private key from the system keychain.
+fn delete_key_from_keyring() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let entry = get_key_entry()?;
+    entry
+        .delete_credential()
+        .map_err(|e| format!("Failed to delete key from keyring: {}", e))?;
+    tracing::debug!("Private key deleted from system keychain");
+    Ok(())
+}
+
+/// Migrates an old plaintext key file to secure keychain storage.
+/// Returns true if migration was performed, false if no migration needed.
+fn migrate_legacy_key() -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    let legacy_path = get_legacy_key_path()?;
+
+    if !legacy_path.exists() {
+        return Ok(false);
+    }
+
+    tracing::info!("Found legacy plaintext key file, migrating to secure storage...");
+
+    // Read the old key
+    let key_bytes = std::fs::read(&legacy_path)?;
+
+    // Store in keyring
+    store_key_in_keyring(&key_bytes)?;
+
+    // Securely delete the old file by overwriting with zeros before removal
+    let zeros = vec![0u8; key_bytes.len()];
+    if let Err(e) = std::fs::write(&legacy_path, &zeros) {
+        tracing::warn!("Failed to overwrite legacy key file: {}", e);
+    }
+
+    // Remove the file
+    if let Err(e) = std::fs::remove_file(&legacy_path) {
+        tracing::warn!("Failed to remove legacy key file: {}", e);
+    } else {
+        tracing::info!("Legacy key file securely removed");
+    }
+
+    Ok(true)
+}
+
+/// Generates a new certificate and key pair, saving both to disk/keychain.
 ///
 /// The certificate is valid for:
 /// - `localhost`
@@ -41,7 +130,6 @@ fn generate_and_save_cert() -> Result<
     Box<dyn std::error::Error + Send + Sync>,
 > {
     let cert_path = get_cert_path()?;
-    let key_path = get_key_path()?;
 
     let mut params = CertificateParams::default();
 
@@ -72,14 +160,13 @@ fn generate_and_save_cert() -> Result<
     let key_pair = KeyPair::generate()?;
     let cert = params.self_signed(&key_pair)?;
 
-    // Save certificate in DER format (.cer)
+    // Save certificate in DER format (.cer) - this is public, no encryption needed
     std::fs::write(&cert_path, cert.der())?;
     tracing::info!("Certificate saved to: {}", cert_path.display());
 
-    // Save private key in DER format
+    // Save private key securely in system keychain
     let key_der_bytes = key_pair.serialize_der();
-    std::fs::write(&key_path, &key_der_bytes)?;
-    tracing::info!("Private key saved to: {}", key_path.display());
+    store_key_in_keyring(&key_der_bytes)?;
 
     // Convert to rustls types
     // rcgen serializes ECDSA keys in PKCS#8 format
@@ -89,42 +176,53 @@ fn generate_and_save_cert() -> Result<
     Ok((vec![cert_der], key_der))
 }
 
-/// Loads an existing certificate and key from disk.
+/// Loads an existing certificate from disk and key from keychain.
 fn load_cert_from_disk() -> Result<
     (Vec<CertificateDer<'static>>, PrivateKeyDer<'static>),
     Box<dyn std::error::Error + Send + Sync>,
 > {
     let cert_path = get_cert_path()?;
-    let key_path = get_key_path()?;
 
     let cert_bytes = std::fs::read(&cert_path)?;
-    let key_bytes = std::fs::read(&key_path)?;
+    let key_bytes = load_key_from_keyring()?;
 
     let cert_der = CertificateDer::from(cert_bytes);
     // rcgen serializes keys in PKCS#8 format, so explicitly use that type
     let key_der = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key_bytes));
 
-    tracing::debug!("Loaded certificate from disk");
+    tracing::debug!("Loaded certificate from disk and key from keychain");
 
     Ok((vec![cert_der], key_der))
 }
 
 /// Gets or creates the certificate and key pair.
 ///
-/// If a certificate already exists on disk, it will be loaded.
+/// If a certificate already exists on disk and key in keychain, they will be loaded.
 /// Otherwise, a new certificate will be generated and saved.
+///
+/// This function also handles migration from plaintext key files to secure keychain storage.
 pub fn get_or_create_cert() -> Result<
     (Vec<CertificateDer<'static>>, PrivateKeyDer<'static>),
     Box<dyn std::error::Error + Send + Sync>,
 > {
-    let cert_path = get_cert_path()?;
-    let key_path = get_key_path()?;
+    // First, check if we need to migrate a legacy plaintext key
+    if let Err(e) = migrate_legacy_key() {
+        tracing::warn!("Failed to migrate legacy key: {}", e);
+    }
 
-    if cert_path.exists() && key_path.exists() {
+    let cert_path = get_cert_path()?;
+
+    // Check if cert exists on disk and key exists in keyring
+    if cert_path.exists() {
         match load_cert_from_disk() {
             Ok(result) => return Ok(result),
             Err(e) => {
-                tracing::warn!("Failed to load existing certificate, regenerating: {}", e);
+                tracing::warn!(
+                    "Failed to load existing certificate/key, regenerating: {}",
+                    e
+                );
+                // Clean up any partial state
+                let _ = delete_key_from_keyring();
             }
         }
     }
