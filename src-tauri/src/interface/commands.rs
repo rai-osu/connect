@@ -4,8 +4,8 @@ use parking_lot::RwLock;
 use tauri::{tray::TrayIconId, AppHandle, Manager, State};
 
 use crate::application::{
-    detect_osu_path, get_osu_path, is_osu_running, is_valid_osu_installation, launch_osu,
-    ProxyManager,
+    create_desktop_shortcut, detect_osu_path, get_osu_path, is_osu_running,
+    is_valid_osu_installation, launch_osu, remove_desktop_shortcut, shortcut_exists, ProxyManager,
 };
 use crate::domain::{AppConfig, AppState};
 use crate::infrastructure::logging::{LogBuffer, LogEntry};
@@ -195,4 +195,19 @@ pub fn update_tray_status(app: AppHandle, status: String, downloads: Option<u64>
         };
         let _ = tray.set_tooltip(Some(&tooltip));
     }
+}
+
+#[tauri::command]
+pub fn create_launch_shortcut() -> Result<String, String> {
+    create_desktop_shortcut().map(|p| p.display().to_string())
+}
+
+#[tauri::command]
+pub fn check_shortcut_exists() -> bool {
+    shortcut_exists()
+}
+
+#[tauri::command]
+pub fn remove_launch_shortcut() -> Result<(), String> {
+    remove_desktop_shortcut()
 }

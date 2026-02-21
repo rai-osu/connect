@@ -10,12 +10,14 @@ use tauri::{
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use application::{get_osu_path, launch_osu, ProxyManager};
 use infrastructure::logging::{LogBuffer, LogCaptureLayer};
 use interface::{
-    clear_logs, connect, detect_osu, disconnect, get_certificate_path, get_config,
-    get_latest_log_id, get_logs, get_logs_since, get_status, hide_window, install_certificate,
-    is_certificate_installed, is_osu_running_cmd, load_saved_config, quit_app, set_config,
-    show_window, start_proxy, update_tray_status, validate_osu_path, TauriState,
+    check_shortcut_exists, clear_logs, connect, create_launch_shortcut, detect_osu, disconnect,
+    get_certificate_path, get_config, get_latest_log_id, get_logs, get_logs_since, get_status,
+    hide_window, install_certificate, is_certificate_installed, is_osu_running_cmd,
+    load_saved_config, quit_app, remove_launch_shortcut, set_config, show_window, start_proxy,
+    update_tray_status, validate_osu_path, TauriState,
 };
 
 fn init_logging(log_buffer: LogBuffer) {
@@ -62,7 +64,51 @@ pub fn run() {
             setup_tray(app)?;
 
             let has_minimized_flag = std::env::args().any(|a| a == "--minimized");
-            if config.start_minimized || has_minimized_flag {
+            let has_launch_osu_flag = std::env::args().any(|a| a == "--launch-osu");
+
+            if has_launch_osu_flag {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+
+                let app_handle = app.handle().clone();
+                let config_clone = config.clone();
+
+                tauri::async_runtime::spawn(async move {
+                    tracing::info!("--launch-osu: Starting proxy and launching osu!");
+
+                    let mut proxy_manager = ProxyManager::new(config_clone.proxy.clone());
+                    if let Err(e) = proxy_manager.start().await {
+                        tracing::error!("--launch-osu: Failed to start proxy: {}", e);
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                        return;
+                    }
+
+                    let state = app_handle.state::<TauriState>();
+                    *state.proxy.write() = Some(proxy_manager);
+
+                    if let Some(osu_path) = get_osu_path(&config_clone) {
+                        if let Err(e) = launch_osu(&osu_path, "localhost") {
+                            tracing::error!("--launch-osu: Failed to launch osu!: {}", e);
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        } else {
+                            tracing::info!("--launch-osu: osu! launched successfully");
+                        }
+                    } else {
+                        tracing::error!("--launch-osu: osu! path not configured");
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                });
+            } else if config.start_minimized || has_minimized_flag {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.hide();
                 }
@@ -93,6 +139,9 @@ pub fn run() {
             install_certificate,
             get_certificate_path,
             update_tray_status,
+            create_launch_shortcut,
+            check_shortcut_exists,
+            remove_launch_shortcut,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
