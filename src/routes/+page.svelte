@@ -21,10 +21,13 @@
   import Settings from "$lib/components/Settings.svelte";
   import LogViewer from "$lib/components/LogViewer.svelte";
   import UpdateNotification from "$lib/components/UpdateNotification.svelte";
+  import Onboarding from "$lib/components/Onboarding.svelte";
+  import Tooltip from "$lib/components/Tooltip.svelte";
   import { FileText, Settings as SettingsIcon } from "lucide-svelte";
 
   let showSettings = $state(false);
   let showLogs = $state(false);
+  let showOnboarding = $state(false);
 
   const connected = $derived(isConnected());
   const connecting = $derived(isConnecting());
@@ -32,10 +35,17 @@
   const connectable = $derived(canConnect());
 
   onMount(() => {
+    // Check if onboarding has been completed
+    const onboardingCompleted = localStorage.getItem("raiconnect_onboarding_completed");
+    if (!onboardingCompleted) {
+      showOnboarding = true;
+    }
+
     (async () => {
       await loadConfig();
 
-      if (!store.config.osu_path) {
+      // Only auto-detect if onboarding was already completed
+      if (!store.config.osu_path && !showOnboarding) {
         const detected = await detectOsuPath();
         if (detected) {
           await updateConfig("osu_path", detected);
@@ -54,6 +64,10 @@
 
     return () => clearInterval(interval);
   });
+
+  function handleOnboardingComplete() {
+    showOnboarding = false;
+  }
 </script>
 
 <main class="min-h-screen bg-background p-6 flex flex-col font-sans">
@@ -67,29 +81,37 @@
     </div>
     <div class="flex items-center gap-2">
       {#if store.config.debug_logging}
-        <Button
-          variant="ghost"
-          size="icon"
-          onclick={() => { showLogs = !showLogs; showSettings = false; }}
-          class={showLogs ? "bg-accent text-accent-foreground" : ""}
-          aria-label="Logs"
-        >
+        <Tooltip text="View debug logs and proxy activity" position="bottom">
           {#snippet children()}
-            <FileText class="w-5 h-5" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onclick={() => { showLogs = !showLogs; showSettings = false; }}
+              class={showLogs ? "bg-accent text-accent-foreground" : ""}
+              aria-label="Logs"
+            >
+              {#snippet children()}
+                <FileText class="w-5 h-5" />
+              {/snippet}
+            </Button>
           {/snippet}
-        </Button>
+        </Tooltip>
       {/if}
-      <Button
-        variant="ghost"
-        size="icon"
-        onclick={() => { showSettings = !showSettings; showLogs = false; }}
-        class={showSettings ? "bg-accent text-accent-foreground" : ""}
-        aria-label="Settings"
-      >
+      <Tooltip text="Configure osu! path and proxy settings" position="bottom">
         {#snippet children()}
-          <SettingsIcon class="w-5 h-5" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onclick={() => { showSettings = !showSettings; showLogs = false; }}
+            class={showSettings ? "bg-accent text-accent-foreground" : ""}
+            aria-label="Settings"
+          >
+            {#snippet children()}
+              <SettingsIcon class="w-5 h-5" />
+            {/snippet}
+          </Button>
         {/snippet}
-      </Button>
+      </Tooltip>
     </div>
   </header>
 
@@ -133,44 +155,56 @@
 
         <div class="flex gap-3">
           {#if connected}
-            <Button
-              variant="destructive"
-              onclick={() => disconnect()}
-              loading={store.isLoading}
-            >
+            <Tooltip text="Stop the proxy server and restore hosts file" position="top">
               {#snippet children()}
-                Disconnect
+                <Button
+                  variant="destructive"
+                  onclick={() => disconnect()}
+                  loading={store.isLoading}
+                >
+                  {#snippet children()}
+                    Disconnect
+                  {/snippet}
+                </Button>
               {/snippet}
-            </Button>
+            </Tooltip>
           {:else}
-            <Button
-              variant="primary"
-              onclick={() => connect()}
-              disabled={!connectable}
-              loading={connecting || store.isLoading}
-            >
+            <Tooltip text="Starts the proxy server, adds hosts file entries, and launches osu! with the devserver flag" position="top">
               {#snippet children()}
-                {#if connecting}
-                  Connecting...
-                {:else}
-                  Connect & Launch osu!
-                {/if}
+                <Button
+                  variant="primary"
+                  onclick={() => connect()}
+                  disabled={!connectable}
+                  loading={connecting || store.isLoading}
+                >
+                  {#snippet children()}
+                    {#if connecting}
+                      Connecting...
+                    {:else}
+                      Connect & Launch osu!
+                    {/if}
+                  {/snippet}
+                </Button>
               {/snippet}
-            </Button>
-            <Button
-              variant="outline"
-              onclick={() => startProxy()}
-              disabled={connecting || store.isLoading}
-              loading={connecting || store.isLoading}
-            >
+            </Tooltip>
+            <Tooltip text="Only starts the proxy without launching osu!. Use this if osu! is already running or you prefer manual setup" position="top">
               {#snippet children()}
-                {#if connecting}
-                  Starting...
-                {:else}
-                  Start Proxy Only
-                {/if}
+                <Button
+                  variant="outline"
+                  onclick={() => startProxy()}
+                  disabled={connecting || store.isLoading}
+                  loading={connecting || store.isLoading}
+                >
+                  {#snippet children()}
+                    {#if connecting}
+                      Starting...
+                    {:else}
+                      Start Proxy Only
+                    {/if}
+                  {/snippet}
+                </Button>
               {/snippet}
-            </Button>
+            </Tooltip>
           {/if}
         </div>
       </div>
@@ -203,3 +237,7 @@
     </a>
   </footer>
 </main>
+
+{#if showOnboarding}
+  <Onboarding onComplete={handleOnboardingComplete} />
+{/if}
