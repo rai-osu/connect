@@ -7,6 +7,7 @@ export interface UpdateState {
   downloading: boolean;
   progress: number;
   error: string | null;
+  errorPhase: "check" | "download" | null;
   version: string | null;
   releaseNotes: string | null;
   dismissed: boolean;
@@ -18,6 +19,7 @@ const defaultState: UpdateState = {
   downloading: false,
   progress: 0,
   error: null,
+  errorPhase: null,
   version: null,
   releaseNotes: null,
   dismissed: false,
@@ -60,6 +62,7 @@ export async function checkForUpdates(): Promise<void> {
   } catch (e) {
     console.error("Failed to check for updates:", e);
     updateStore.error = String(e);
+    updateStore.errorPhase = "check";
   } finally {
     updateStore.checking = false;
   }
@@ -96,11 +99,33 @@ export async function downloadAndInstall(): Promise<void> {
   } catch (e) {
     console.error("Failed to download/install update:", e);
     updateStore.error = String(e);
+    updateStore.errorPhase = "download";
     updateStore.downloading = false;
   }
 }
 
 export function dismissUpdate(): void {
+  updateStore.dismissed = true;
+}
+
+export function clearError(): void {
+  updateStore.error = null;
+  updateStore.errorPhase = null;
+}
+
+export async function retryUpdate(): Promise<void> {
+  const phase = updateStore.errorPhase;
+  clearError();
+
+  if (phase === "check") {
+    await checkForUpdates();
+  } else if (phase === "download") {
+    await downloadAndInstall();
+  }
+}
+
+export function dismissError(): void {
+  clearError();
   updateStore.dismissed = true;
 }
 

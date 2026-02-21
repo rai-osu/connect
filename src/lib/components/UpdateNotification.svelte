@@ -5,12 +5,15 @@
     isDownloading,
     downloadAndInstall,
     dismissUpdate,
+    retryUpdate,
+    dismissError,
   } from "$lib/stores/updater.svelte";
   import Button from "./Button.svelte";
-  import { Download, X } from "lucide-svelte";
+  import { Download, X, RotateCcw } from "lucide-svelte";
 
   const available = $derived(isUpdateAvailable());
   const downloading = $derived(isDownloading());
+  const hasError = $derived(!!updateStore.error);
 </script>
 
 {#if available}
@@ -79,10 +82,33 @@
       </div>
     {/if}
 
-    {#if updateStore.error}
-      <p class="mt-2 text-xs text-destructive">
-        Failed to update: {updateStore.error}
-      </p>
+    {#if hasError}
+      <div class="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+        <p class="text-xs text-destructive mb-2">
+          Failed to {updateStore.errorPhase === "check" ? "check for updates" : "download update"}: {updateStore.error}
+        </p>
+        <div class="flex gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onclick={() => retryUpdate()}
+          >
+            {#snippet children()}
+              <RotateCcw class="w-3 h-3 mr-1" />
+              Retry
+            {/snippet}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onclick={() => dismissError()}
+          >
+            {#snippet children()}
+              Dismiss
+            {/snippet}
+          </Button>
+        </div>
+      </div>
     {/if}
   </div>
 {/if}
