@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Play, Zap, FolderSearch } from "lucide-svelte";
+  import { Play, Zap, FolderSearch, ExternalLink } from "lucide-svelte";
   import Button from "./Button.svelte";
-  import { detectOsuPath, updateConfig, store } from "$lib/stores/app.svelte";
+  import { detectOsuPath, updateConfig, store, createDesktopShortcut, checkShortcutExists } from "$lib/stores/app.svelte";
 
   interface Props {
     onComplete: () => void;
@@ -13,8 +13,11 @@
   let dontShowAgain = $state(true);
   let isDetecting = $state(false);
   let detectedPath = $state<string | null>(null);
+  let isCreatingShortcut = $state(false);
+  let shortcutCreated = $state(false);
+  let shortcutPath = $state<string | null>(null);
 
-  const totalSteps = 3;
+  const totalSteps = 4;
 
   async function handleDetect() {
     isDetecting = true;
@@ -29,9 +32,34 @@
     }
   }
 
+  async function handleCreateShortcut() {
+    isCreatingShortcut = true;
+    try {
+      const path = await createDesktopShortcut();
+      if (path) {
+        shortcutCreated = true;
+        shortcutPath = path;
+      }
+    } finally {
+      isCreatingShortcut = false;
+    }
+  }
+
+  // Check if shortcut already exists when reaching step 4
+  async function checkExistingShortcut() {
+    const exists = await checkShortcutExists();
+    if (exists) {
+      shortcutCreated = true;
+    }
+  }
+
   function handleNext() {
     if (currentStep < totalSteps - 1) {
       currentStep++;
+      // Check if shortcut exists when reaching step 4 (index 3)
+      if (currentStep === 3) {
+        checkExistingShortcut();
+      }
     } else {
       handleComplete();
     }
@@ -159,6 +187,50 @@
               Don't worry, you can set the path manually in Settings later.
             </p>
           {/if}
+        </div>
+
+      {:else if currentStep === 3}
+        <!-- Step 4: Desktop Shortcut -->
+        <div class="flex-1">
+          <h2 class="text-xl font-bold text-foreground mb-2 text-center">Quick Launch</h2>
+          <p class="text-muted-foreground text-center mb-6">
+            Create a desktop shortcut to launch osu! with rai in one click
+          </p>
+
+          <div class="p-4 bg-muted/50 rounded-lg border border-border mb-6">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-secondary/20 rounded-lg">
+                  <ExternalLink class="w-5 h-5 text-secondary" />
+                </div>
+                <div>
+                  <h3 class="font-semibold text-foreground">Desktop Shortcut</h3>
+                  {#if shortcutCreated}
+                    <p class="text-xs text-success">Shortcut created!</p>
+                  {:else}
+                    <p class="text-xs text-muted-foreground">Launch osu! with rai in one click</p>
+                  {/if}
+                </div>
+              </div>
+              {#if !shortcutCreated}
+                <Button variant="outline" onclick={handleCreateShortcut} loading={isCreatingShortcut}>
+                  {#snippet children()}
+                    Create
+                  {/snippet}
+                </Button>
+              {:else}
+                <span class="text-success text-sm">✓ Created</span>
+              {/if}
+            </div>
+          </div>
+
+          <p class="text-xs text-muted-foreground text-center">
+            {#if shortcutCreated}
+              Double-click the shortcut on your desktop to start playing!
+            {:else}
+              This step is optional. You can also create the shortcut later in Settings.
+            {/if}
+          </p>
         </div>
       {/if}
     </div>

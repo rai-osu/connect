@@ -1,12 +1,36 @@
 <script lang="ts">
-  import { store, updateConfig, detectOsuPath, validateOsuPath, isConnected } from "$lib/stores/app.svelte";
+  import { store, updateConfig, detectOsuPath, validateOsuPath, isConnected, createDesktopShortcut, checkShortcutExists, removeDesktopShortcut } from "$lib/stores/app.svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import { Info } from "lucide-svelte";
+  import { Info, ExternalLink, Trash2 } from "lucide-svelte";
   import Button from "./Button.svelte";
   import Tooltip from "./Tooltip.svelte";
+  import { onMount } from "svelte";
 
   let isDetecting = $state(false);
   let pathInput = $state(store.config.osu_path ?? "");
+  let shortcutExists = $state(false);
+  let isShortcutLoading = $state(false);
+
+  onMount(async () => {
+    shortcutExists = await checkShortcutExists();
+  });
+
+  async function handleShortcutToggle() {
+    isShortcutLoading = true;
+    try {
+      if (shortcutExists) {
+        await removeDesktopShortcut();
+        shortcutExists = false;
+      } else {
+        const result = await createDesktopShortcut();
+        if (result) {
+          shortcutExists = true;
+        }
+      }
+    } finally {
+      isShortcutLoading = false;
+    }
+  }
 
   async function handleDetect() {
     isDetecting = true;
@@ -181,6 +205,45 @@
         </span>
       </div>
     </label>
+
+    <div class="pt-4 border-t border-border">
+      <div class="flex items-center justify-between">
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium text-foreground">
+              Desktop Shortcut
+            </span>
+            <Tooltip text="Creates a shortcut on your desktop that launches osu! through rai!connect in one click" position="right">
+              {#snippet children()}
+                <Info class="w-4 h-4 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
+              {/snippet}
+            </Tooltip>
+          </div>
+          <span class="text-xs text-muted-foreground">
+            {#if shortcutExists}
+              Shortcut exists on desktop
+            {:else}
+              Launch osu! with rai in one click
+            {/if}
+          </span>
+        </div>
+        <Button
+          variant={shortcutExists ? "destructive" : "outline"}
+          onclick={handleShortcutToggle}
+          loading={isShortcutLoading}
+        >
+          {#snippet children()}
+            {#if shortcutExists}
+              <Trash2 class="w-4 h-4 mr-1" />
+              Remove
+            {:else}
+              <ExternalLink class="w-4 h-4 mr-1" />
+              Create
+            {/if}
+          {/snippet}
+        </Button>
+      </div>
+    </div>
 
     <div class="pt-4 border-t border-border">
       <div class="flex items-start gap-3 cursor-pointer group">

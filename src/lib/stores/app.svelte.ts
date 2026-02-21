@@ -263,3 +263,38 @@ export async function clearLogs(): Promise<void> {
     stopLoading("clearLogs");
   }
 }
+
+export async function createDesktopShortcut(): Promise<string | null> {
+  startLoading("createShortcut");
+  try {
+    return await invoke<string>("create_launch_shortcut");
+  } catch (e) {
+    console.error("Failed to create desktop shortcut:", e);
+    setError("create desktop shortcut", e);
+    return null;
+  } finally {
+    stopLoading("createShortcut");
+  }
+}
+
+export async function checkShortcutExists(): Promise<boolean> {
+  try {
+    return await invoke<boolean>("check_shortcut_exists");
+  } catch (e) {
+    console.error("Failed to check shortcut:", e);
+    return false;
+  }
+}
+
+export async function removeDesktopShortcut(): Promise<void> {
+  startLoading("removeShortcut");
+  try {
+    await invoke("remove_launch_shortcut");
+  } catch (e) {
+    console.error("Failed to remove desktop shortcut:", e);
+    setError("remove desktop shortcut", e);
+    throw e;
+  } finally {
+    stopLoading("removeShortcut");
+  }
+}
