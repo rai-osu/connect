@@ -1,0 +1,7 @@
+pre-commit:
+  parallel: true
+  commands:
+    rust-fmt:
+      run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+    rust-clippy:
+      run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
