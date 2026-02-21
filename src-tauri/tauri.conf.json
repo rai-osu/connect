@@ -28,11 +28,6 @@
         "maximizable": false
       }
     ],
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
-      "tooltip": "rai!connect"
-    },
     "security": {
       "csp": "default-src 'self'; img-src 'self' https://assets.ppy.sh https://b.ppy.sh data:; connect-src 'self' https://direct.rai.moe https://api.rai.moe; style-src 'self' 'unsafe-inline'"
     }

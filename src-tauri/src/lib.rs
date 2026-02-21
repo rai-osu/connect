@@ -227,6 +227,13 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "quit" => {
+                let state = app.state::<TauriState>();
+                let proxy = state.proxy.write().take();
+                if let Some(mut pm) = proxy {
+                    tauri::async_runtime::spawn(async move {
+                        let _ = pm.stop().await;
+                    });
+                }
                 app.exit(0);
             }
             _ => {}
