@@ -263,7 +263,33 @@ pub fn get_or_create_cert() -> Result<
 pub fn create_tls_acceptor() -> Result<TlsAcceptor, Box<dyn std::error::Error + Send + Sync>> {
     let (certs, key) = get_or_create_cert()?;
 
-    // Use ring crypto provider explicitly
+    match try_create_tls_config(certs.clone(), key) {
+        Ok(config) => Ok(TlsAcceptor::from(Arc::new(config))),
+        Err(e) => {
+            // Key format might be corrupted or from old version - regenerate
+            tracing::warn!(
+                "Failed to parse stored key ({}), regenerating certificate...",
+                e
+            );
+
+            // Delete old cert and key
+            let _ = delete_key_from_keyring();
+            if let Ok(cert_path) = get_cert_path() {
+                let _ = std::fs::remove_file(cert_path);
+            }
+
+            // Generate fresh cert and key
+            let (new_certs, new_key) = generate_and_save_cert()?;
+            let config = try_create_tls_config(new_certs, new_key)?;
+            Ok(TlsAcceptor::from(Arc::new(config)))
+        }
+    }
+}
+
+fn try_create_tls_config(
+    certs: Vec<CertificateDer<'static>>,
+    key: PrivateKeyDer<'static>,
+) -> Result<ServerConfig, Box<dyn std::error::Error + Send + Sync>> {
     let provider = Arc::new(default_provider());
 
     let config = ServerConfig::builder_with_provider(provider)
@@ -273,7 +299,7 @@ pub fn create_tls_acceptor() -> Result<TlsAcceptor, Box<dyn std::error::Error + 
         .with_single_cert(certs, key)
         .map_err(|e| format!("Failed to create TLS config: {}", e))?;
 
-    Ok(TlsAcceptor::from(Arc::new(config)))
+    Ok(config)
 }
 
 /// Generates (if needed) and installs the certificate into the Windows trusted root store.
