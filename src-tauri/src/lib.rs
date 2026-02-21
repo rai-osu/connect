@@ -41,12 +41,53 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // When a second instance tries to launch, focus the existing window
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-                tracing::info!("Second instance detected, focusing existing window");
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            let has_launch_osu = args.iter().any(|a| a == "--launch-osu");
+
+            if has_launch_osu {
+                tracing::info!("Second instance with --launch-osu, triggering osu! launch");
+                let app_handle = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let state = app_handle.state::<TauriState>();
+                    let config = state.config.read().clone();
+
+                    // Check if proxy is already running
+                    let proxy_running = state.proxy.read().is_some();
+
+                    if !proxy_running {
+                        let mut proxy_manager = ProxyManager::new(config.proxy.clone());
+                        if let Err(e) = proxy_manager.start().await {
+                            tracing::error!("--launch-osu: Failed to start proxy: {}", e);
+                            return;
+                        }
+                        *state.proxy.write() = Some(proxy_manager);
+                        tracing::info!("--launch-osu: Proxy started");
+                    } else {
+                        tracing::info!("--launch-osu: Proxy already running");
+                    }
+
+                    // Launch osu!
+                    if let Some(osu_path) = get_osu_path(&config) {
+                        if let Err(e) = launch_osu(&osu_path, "localhost") {
+                            tracing::error!("--launch-osu: Failed to launch osu!: {}", e);
+                        } else {
+                            tracing::info!("--launch-osu: osu! launched successfully");
+                        }
+                    } else {
+                        tracing::error!("--launch-osu: osu! path not configured");
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                });
+            } else {
+                // Regular second instance: just focus the window
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                    tracing::info!("Second instance detected, focusing existing window");
+                }
             }
         }))
         .plugin(tauri_plugin_autostart::init(
