@@ -332,6 +332,12 @@ async fn handle_request(
             forward_to_raimoe(req, &direct_base_url, &client).await
         }
         RouteDecision::ForwardToPpy => forward_to_ppy(req, &host, inject_supporter, &client).await,
+        RouteDecision::RedirectToPpy => {
+            let ppy_host = map_host_to_ppy(&host);
+            let redirect_url = format!("https://{}{}", ppy_host, path);
+            tracing::debug!("Redirecting to: {}", redirect_url);
+            redirect_response(&redirect_url)
+        }
     };
 
     Ok(response)
@@ -614,6 +620,18 @@ fn error_response(status: StatusCode, message: &str) -> Response<BoxBody<Bytes, 
                 .map_err(|_| unreachable!())
                 .boxed(),
         )
+        .unwrap()
+}
+
+/// Creates a redirect response to the given URL.
+///
+/// Returns a 302 Found response that redirects the browser to the target URL.
+/// Used for redirecting website requests to osu.ppy.sh.
+fn redirect_response(url: &str) -> Response<BoxBody<Bytes, Infallible>> {
+    Response::builder()
+        .status(StatusCode::FOUND)
+        .header("location", url)
+        .body(Full::new(Bytes::new()).map_err(|_| unreachable!()).boxed())
         .unwrap()
 }
 
