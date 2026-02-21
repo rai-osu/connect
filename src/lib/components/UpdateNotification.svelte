@@ -59,30 +59,7 @@
           ></div>
         </div>
       </div>
-    {:else}
-      <div class="mt-3 flex gap-2">
-        <Button
-          variant="primary"
-          size="sm"
-          onclick={() => downloadAndInstall()}
-        >
-          {#snippet children()}
-            Update Now
-          {/snippet}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={() => dismissUpdate()}
-        >
-          {#snippet children()}
-            Later
-          {/snippet}
-        </Button>
-      </div>
-    {/if}
-
-    {#if hasError}
+    {:else if hasError}
       <div class="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
         <p class="text-xs text-destructive mb-2">
           Failed to {updateStore.errorPhase === "check" ? "check for updates" : "download update"}: {updateStore.error}
@@ -108,6 +85,27 @@
             {/snippet}
           </Button>
         </div>
+      </div>
+    {:else}
+      <div class="mt-3 flex gap-2">
+        <Button
+          variant="primary"
+          size="sm"
+          onclick={() => downloadAndInstall()}
+        >
+          {#snippet children()}
+            Update Now
+          {/snippet}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={() => dismissUpdate()}
+        >
+          {#snippet children()}
+            Later
+          {/snippet}
+        </Button>
       </div>
     {/if}
   </div>
