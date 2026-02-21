@@ -280,6 +280,16 @@ pub fn create_tls_acceptor() -> Result<TlsAcceptor, Box<dyn std::error::Error + 
 
             // Generate fresh cert and key
             let (new_certs, new_key) = generate_and_save_cert()?;
+
+            // Reinstall the new certificate to Windows trust store
+            #[cfg(target_os = "windows")]
+            {
+                tracing::info!("Installing regenerated certificate to trust store...");
+                if let Err(e) = install_certificate() {
+                    tracing::warn!("Failed to auto-install regenerated certificate: {}", e);
+                }
+            }
+
             let config = try_create_tls_config(new_certs, new_key)?;
             Ok(TlsAcceptor::from(Arc::new(config)))
         }
