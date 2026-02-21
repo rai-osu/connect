@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Play, Zap, FolderSearch, ExternalLink } from "lucide-svelte";
   import Button from "./Button.svelte";
+  import Checkbox from "./Checkbox.svelte";
   import { detectOsuPath, updateConfig, store, createDesktopShortcut, checkShortcutExists } from "$lib/stores/app.svelte";
 
   interface Props {
@@ -239,11 +240,7 @@
     <div class="mt-6 pt-6 border-t border-border">
       <!-- Don't show again checkbox -->
       <label class="flex items-center gap-2 mb-4 cursor-pointer group">
-        <input
-          type="checkbox"
-          bind:checked={dontShowAgain}
-          class="w-4 h-4 rounded border-input bg-input text-primary accent-primary focus:ring-primary focus:ring-offset-background"
-        />
+        <Checkbox bind:checked={dontShowAgain} />
         <span class="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
           Don't show this again
         </span>

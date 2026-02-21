@@ -3,6 +3,7 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { Info, ExternalLink, Trash2 } from "lucide-svelte";
   import Button from "./Button.svelte";
+  import Checkbox from "./Checkbox.svelte";
   import Tooltip from "./Tooltip.svelte";
   import { onMount } from "svelte";
 
@@ -144,11 +145,9 @@
 
   <div class="space-y-3">
     <label class="flex items-center gap-3 cursor-pointer group">
-      <input
-        type="checkbox"
+      <Checkbox
         checked={store.config.start_at_boot}
         onchange={() => handleToggle("start_at_boot")}
-        class="w-4 h-4 rounded border-input bg-input text-primary accent-primary focus:ring-primary focus:ring-offset-background"
       />
       <div class="flex flex-col">
         <span class="text-sm text-foreground group-hover:text-primary transition-colors">
@@ -161,11 +160,9 @@
     </label>
 
     <label class="flex items-center gap-3 cursor-pointer group">
-      <input
-        type="checkbox"
+      <Checkbox
         checked={store.config.minimize_to_tray}
         onchange={() => handleToggle("minimize_to_tray")}
-        class="w-4 h-4 rounded border-input bg-input text-primary accent-primary focus:ring-primary focus:ring-offset-background"
       />
       <div class="flex flex-col">
         <span class="text-sm text-foreground group-hover:text-primary transition-colors">
@@ -178,11 +175,9 @@
     </label>
 
     <label class="flex items-center gap-3 cursor-pointer group">
-      <input
-        type="checkbox"
+      <Checkbox
         checked={store.config.start_minimized}
         onchange={() => handleToggle("start_minimized")}
-        class="w-4 h-4 rounded border-input bg-input text-primary accent-primary focus:ring-primary focus:ring-offset-background"
       />
       <div class="flex flex-col">
         <span class="text-sm text-foreground group-hover:text-primary transition-colors">
@@ -195,11 +190,9 @@
     </label>
 
     <label class="flex items-center gap-3 cursor-pointer group">
-      <input
-        type="checkbox"
+      <Checkbox
         checked={store.config.debug_logging}
         onchange={() => handleToggle("debug_logging")}
-        class="w-4 h-4 rounded border-input bg-input text-primary accent-primary focus:ring-primary focus:ring-offset-background"
       />
       <div class="flex flex-col">
         <span class="text-sm text-foreground group-hover:text-primary transition-colors">
@@ -255,8 +248,7 @@
 
     <div class="pt-4 border-t border-border">
       <label class="flex items-start gap-3 cursor-pointer group">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={store.config.proxy.inject_supporter}
           onclick={(e) => {
             if (!store.config.proxy.inject_supporter) {
@@ -270,7 +262,7 @@
               updateConfig("proxy", newProxy);
             }
           }}
-          class="w-4 h-4 mt-0.5 rounded border-input bg-input text-primary accent-primary focus:ring-primary focus:ring-offset-background"
+          class="mt-0.5"
         />
         <div class="flex flex-col flex-1">
           <div class="flex items-center gap-2">

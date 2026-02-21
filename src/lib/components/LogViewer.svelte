@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { store, getLogs, getLogsSince, getLastLogId, clearLogs } from "$lib/stores/app.svelte";
   import Button from "./Button.svelte";
+  import Checkbox from "./Checkbox.svelte";
 
   let autoRefresh = $state(true);
   let isVisible = $state(true);
@@ -86,11 +87,7 @@
     </div>
     <div class="flex items-center gap-2">
       <label class="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-        <input
-          type="checkbox"
-          bind:checked={autoRefresh}
-          class="w-3 h-3 rounded border-input bg-input text-primary focus:ring-primary focus:ring-offset-background"
-        />
+        <Checkbox bind:checked={autoRefresh} size="sm" />
         Auto-refresh
       </label>
       <Button variant="outline" size="sm" onclick={handleRefresh}>
