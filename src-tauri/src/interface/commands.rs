@@ -139,6 +139,22 @@ pub fn get_logs(state: State<'_, TauriState>, count: Option<usize>) -> Vec<LogEn
     }
 }
 
+/// Get only logs newer than the given ID for differential updates.
+/// This is much more efficient than get_logs() when polling frequently,
+/// as it only returns new entries since the last fetch.
+#[tauri::command]
+pub fn get_logs_since(state: State<'_, TauriState>, last_id: u64) -> Vec<LogEntry> {
+    state.logs.get_logs_since(last_id)
+}
+
+/// Get the ID of the most recent log entry.
+/// Returns 0 if the log buffer is empty.
+/// The frontend can use this to initialize its tracking state.
+#[tauri::command]
+pub fn get_latest_log_id(state: State<'_, TauriState>) -> u64 {
+    state.logs.get_latest_id()
+}
+
 #[tauri::command]
 pub fn clear_logs(state: State<'_, TauriState>) {
     state.logs.clear();

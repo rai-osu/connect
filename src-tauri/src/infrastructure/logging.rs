@@ -1,9 +1,7 @@
-//! Custom tracing layer for capturing logs and exposing them to the frontend.
-//!
-//! This module provides a `LogCapture` layer that stores log entries in a
-//! bounded circular buffer, allowing the UI to display recent log messages.
+//! Tracing layer for capturing logs and exposing them to the frontend.
 
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use parking_lot::RwLock;
@@ -13,33 +11,48 @@ use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::layer::Context;
 use tracing_subscriber::Layer;
 
-/// Maximum number of log entries to keep in memory
 const MAX_LOG_ENTRIES: usize = 500;
 
-/// A single log entry with timestamp, level, and message
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
+    pub id: u64,
     pub timestamp: String,
     pub level: String,
     pub target: String,
     pub message: String,
 }
 
-/// Thread-safe log buffer
-#[derive(Debug, Clone, Default)]
+/// Thread-safe log buffer with atomic ID generation for differential updates
+#[derive(Debug, Clone)]
 pub struct LogBuffer {
     entries: Arc<RwLock<VecDeque<LogEntry>>>,
+    /// Atomic counter for generating unique, monotonically increasing log IDs
+    next_id: Arc<AtomicU64>,
+}
+
+impl Default for LogBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LogBuffer {
     pub fn new() -> Self {
         Self {
             entries: Arc::new(RwLock::new(VecDeque::with_capacity(MAX_LOG_ENTRIES))),
+            next_id: Arc::new(AtomicU64::new(1)),
         }
     }
 
-    /// Add a new log entry, removing old entries if buffer is full
-    pub fn push(&self, entry: LogEntry) {
+    /// Generate the next unique log ID atomically
+    fn next_id(&self) -> u64 {
+        self.next_id.fetch_add(1, Ordering::Relaxed)
+    }
+
+    /// Add a new log entry, removing old entries if buffer is full.
+    /// The entry's ID will be set automatically.
+    pub fn push(&self, mut entry: LogEntry) {
+        entry.id = self.next_id();
         let mut entries = self.entries.write();
         if entries.len() >= MAX_LOG_ENTRIES {
             entries.pop_front();
@@ -52,10 +65,26 @@ impl LogBuffer {
         self.entries.read().iter().cloned().collect()
     }
 
-    /// Get the most recent N entries
+    /// Get the most recent N entries efficiently using skip/take
     pub fn get_recent(&self, count: usize) -> Vec<LogEntry> {
         let entries = self.entries.read();
-        entries.iter().rev().take(count).rev().cloned().collect()
+        let len = entries.len();
+        let skip = len.saturating_sub(count);
+        entries.iter().skip(skip).cloned().collect()
+    }
+
+    /// Get all log entries with ID greater than `last_id`.
+    /// This enables differential updates - the frontend can track the last
+    /// received ID and only fetch new logs.
+    pub fn get_logs_since(&self, last_id: u64) -> Vec<LogEntry> {
+        let entries = self.entries.read();
+        entries.iter().filter(|e| e.id > last_id).cloned().collect()
+    }
+
+    /// Get the ID of the most recent log entry, or 0 if buffer is empty.
+    /// Useful for the frontend to initialize its tracking state.
+    pub fn get_latest_id(&self) -> u64 {
+        self.entries.read().back().map(|e| e.id).unwrap_or(0)
     }
 
     /// Clear all log entries
@@ -135,6 +164,7 @@ where
         event.record(&mut visitor);
 
         let entry = LogEntry {
+            id: 0, // Will be assigned by LogBuffer::push()
             timestamp,
             level: level_to_string(level),
             target: metadata.target().to_string(),

@@ -21,6 +21,7 @@ export interface AppConfig {
 }
 
 export interface LogEntry {
+  id: number;
   timestamp: string;
   level: string;
   target: string;

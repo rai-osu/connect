@@ -12,9 +12,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use infrastructure::logging::{LogBuffer, LogCaptureLayer};
 use interface::{
-    clear_logs, connect, detect_osu, disconnect, get_certificate_path, get_config, get_logs,
-    get_status, hide_window, install_certificate, is_certificate_installed, is_osu_running_cmd,
-    load_saved_config, quit_app, set_config, show_window, start_proxy, validate_osu_path,
+    clear_logs, connect, detect_osu, disconnect, get_certificate_path, get_config,
+    get_latest_log_id, get_logs, get_logs_since, get_status, hide_window, install_certificate,
+    is_certificate_installed, is_osu_running_cmd, load_saved_config, quit_app, set_config, show_window, start_proxy, validate_osu_path,
     TauriState,
 };
 
@@ -70,6 +70,8 @@ pub fn run() {
             show_window,
             quit_app,
             get_logs,
+            get_logs_since,
+            get_latest_log_id,
             clear_logs,
             is_certificate_installed,
             install_certificate,
