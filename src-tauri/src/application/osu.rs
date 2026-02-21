@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
+#[cfg(target_os = "windows")]
+use tokio::process::Command as TokioCommand;
 
 use crate::domain::AppConfig;
 
@@ -69,10 +71,11 @@ pub fn launch_osu(osu_path: &Path, devserver_host: &str) -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-pub fn is_osu_running() -> bool {
-    let output = Command::new("tasklist")
+pub async fn is_osu_running() -> bool {
+    let output = TokioCommand::new("tasklist")
         .args(["/FI", "IMAGENAME eq osu!.exe", "/NH"])
-        .output();
+        .output()
+        .await;
 
     match output {
         Ok(output) => {
@@ -84,7 +87,7 @@ pub fn is_osu_running() -> bool {
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn is_osu_running() -> bool {
+pub async fn is_osu_running() -> bool {
     false
 }
 

@@ -62,8 +62,8 @@ pub fn validate_osu_path(path: String) -> bool {
 }
 
 #[tauri::command]
-pub fn is_osu_running_cmd() -> bool {
-    is_osu_running()
+pub async fn is_osu_running_cmd() -> bool {
+    is_osu_running().await
 }
 
 #[tauri::command]
