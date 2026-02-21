@@ -8,12 +8,17 @@
 
   let isDetecting = $state(false);
   let pathInput = $state(store.config.osu_path ?? "");
-  let shortcutExists = $state(false);
+  let shortcutExists = $state<boolean | null>(null);
   let isShortcutLoading = $state(false);
 
-  onMount(async () => {
-    shortcutExists = await checkShortcutExists();
+  onMount(() => {
+    // Check shortcut status immediately on mount
+    refreshShortcutStatus();
   });
+
+  async function refreshShortcutStatus() {
+    shortcutExists = await checkShortcutExists();
+  }
 
   async function handleShortcutToggle() {
     isShortcutLoading = true;
@@ -220,7 +225,9 @@
             </Tooltip>
           </div>
           <span class="text-xs text-muted-foreground">
-            {#if shortcutExists}
+            {#if shortcutExists === null}
+              Checking shortcut status...
+            {:else if shortcutExists}
               Shortcut exists on desktop
             {:else}
               Launch osu! with rai in one click
@@ -230,7 +237,8 @@
         <Button
           variant={shortcutExists ? "destructive" : "outline"}
           onclick={handleShortcutToggle}
-          loading={isShortcutLoading}
+          loading={isShortcutLoading || shortcutExists === null}
+          disabled={shortcutExists === null}
         >
           {#snippet children()}
             {#if shortcutExists}
@@ -246,7 +254,7 @@
     </div>
 
     <div class="pt-4 border-t border-border">
-      <div class="flex items-start gap-3 cursor-pointer group">
+      <label class="flex items-start gap-3 cursor-pointer group">
         <input
           type="checkbox"
           checked={store.config.proxy.inject_supporter}
@@ -279,7 +287,7 @@
             Shows the supporter heart icon in-game without requiring osu!supporter. This is purely cosmetic and unlocks osu!direct.
           </span>
         </div>
-      </div>
+      </label>
     </div>
 
     {#if isConnected()}
