@@ -29,8 +29,8 @@ use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 
 use crate::domain::{
-    inject_supporter_privileges, map_host_to_ppy, route_request, AppState, Packet, RouteDecision,
-    ServerPacketId,
+    inject_supporter_privileges, map_host_to_upstream, route_request, AppState, Packet,
+    RouteDecision, ServerPacketId,
 };
 use crate::infrastructure::tls::create_tls_acceptor;
 
@@ -46,114 +46,6 @@ fn is_valid_localhost_host(host: &str) -> bool {
     h == "localhost" || h == "127.0.0.1" || h == "[::1]" || h.ends_with(".localhost")
 }
 
-/// Runs the HTTP proxy server.
-///
-/// Listens on the specified port and handles incoming HTTP requests from the
-/// osu! client. Each request is analyzed and routed to either rai.moe or
-/// the official osu! servers based on the routing rules.
-///
-/// # Arguments
-///
-/// * `port` - The local port to listen on (typically 80 or 8080)
-/// * `direct_base_url` - Base URL for the rai.moe direct API (e.g., `https://direct.rai.moe`)
-/// * `inject_supporter` - If true, modifies Bancho responses to include supporter privileges
-/// * `state` - Shared application state for tracking statistics
-/// * `shutdown` - Receiver for graceful shutdown signal
-/// * `ready_tx` - Optional channel to signal when the server is ready
-///
-/// # Connection Handling
-///
-/// Uses hyper's HTTP/1.1 implementation with a connection-pooled reqwest client
-/// for upstream requests. The client is configured with:
-/// - 10 max idle connections per host
-/// - 30 second idle timeout
-/// - 30 second request timeout
-/// - 10 second connect timeout
-///
-/// # Returns
-///
-/// Returns `Ok(())` when the server shuts down gracefully, or an error if
-/// binding to the port fails.
-pub async fn run_http_proxy(
-    port: u16,
-    direct_base_url: &str,
-    inject_supporter: bool,
-    state: Arc<RwLock<AppState>>,
-    mut shutdown: oneshot::Receiver<()>,
-    ready_tx: Option<oneshot::Sender<()>>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    let listener = TcpListener::bind(addr).await.map_err(|e| {
-        let msg = if e.kind() == std::io::ErrorKind::AddrInUse {
-            format!(
-                "Port {} is already in use. Please close any application using this port (e.g., IIS, Skype, Docker, or another web server).",
-                port
-            )
-        } else if e.kind() == std::io::ErrorKind::PermissionDenied {
-            format!(
-                "Permission denied binding to port {}. Try running as Administrator.",
-                port
-            )
-        } else {
-            format!("Failed to bind to port {}: {}", port, e)
-        };
-        tracing::error!("{}", msg);
-        msg
-    })?;
-
-    tracing::info!("HTTP proxy listening on {}", addr);
-
-    // Signal that we're ready (port is bound)
-    if let Some(tx) = ready_tx {
-        let _ = tx.send(());
-    }
-
-    let direct_base_url = direct_base_url.to_string();
-
-    // Create a shared HTTP client with connection pooling and timeouts
-    let client = Arc::new(
-        reqwest::Client::builder()
-            .pool_max_idle_per_host(10)
-            .pool_idle_timeout(std::time::Duration::from_secs(30))
-            .timeout(std::time::Duration::from_secs(30))
-            .connect_timeout(std::time::Duration::from_secs(10))
-            .build()
-            .unwrap_or_default(),
-    );
-
-    loop {
-        tokio::select! {
-            result = listener.accept() => {
-                let (stream, _) = result?;
-                let io = TokioIo::new(stream);
-
-                let state = Arc::clone(&state);
-                let direct_base_url = direct_base_url.clone();
-                let client = Arc::clone(&client);
-
-                tokio::spawn(async move {
-                    let service = service_fn(move |req| {
-                        handle_request(req, direct_base_url.clone(), inject_supporter, Arc::clone(&state), Arc::clone(&client))
-                    });
-
-                    if let Err(err) = http1::Builder::new()
-                        .serve_connection(io, service)
-                        .await
-                    {
-                        tracing::error!("Connection error: {:?}", err);
-                    }
-                });
-            }
-            _ = &mut shutdown => {
-                tracing::info!("HTTP proxy shutting down");
-                break;
-            }
-        }
-    }
-
-    Ok(())
-}
-
 /// Runs the HTTPS proxy server with TLS.
 ///
 /// Listens on the specified port and handles incoming HTTPS requests from the
@@ -165,6 +57,7 @@ pub async fn run_http_proxy(
 /// * `port` - The local port to listen on (typically 443)
 /// * `direct_base_url` - Base URL for the rai.moe direct API
 /// * `inject_supporter` - If true, modifies Bancho responses to include supporter privileges
+/// * `upstream_server` - The upstream server domain (e.g., "ppy.sh" or "ripple.moe")
 /// * `state` - Shared application state for tracking statistics
 /// * `shutdown` - Receiver for graceful shutdown signal
 /// * `ready_tx` - Optional channel to signal when the server is ready
@@ -177,6 +70,7 @@ pub async fn run_https_proxy(
     port: u16,
     direct_base_url: &str,
     inject_supporter: bool,
+    upstream_server: &str,
     state: Arc<RwLock<AppState>>,
     mut shutdown: oneshot::Receiver<()>,
     ready_tx: Option<oneshot::Sender<()>>,
@@ -210,6 +104,7 @@ pub async fn run_https_proxy(
     }
 
     let direct_base_url = direct_base_url.to_string();
+    let upstream_server = upstream_server.to_string();
 
     // Create a shared HTTP client with connection pooling and timeouts
     let client = Arc::new(
@@ -230,6 +125,7 @@ pub async fn run_https_proxy(
                 let tls_acceptor = tls_acceptor.clone();
                 let state = Arc::clone(&state);
                 let direct_base_url = direct_base_url.clone();
+                let upstream_server = upstream_server.clone();
                 let client = Arc::clone(&client);
 
                 tokio::spawn(async move {
@@ -244,7 +140,7 @@ pub async fn run_https_proxy(
                     let io = TokioIo::new(tls_stream);
 
                     let service = service_fn(move |req| {
-                        handle_request(req, direct_base_url.clone(), inject_supporter, Arc::clone(&state), Arc::clone(&client))
+                        handle_request(req, direct_base_url.clone(), inject_supporter, upstream_server.clone(), Arc::clone(&state), Arc::clone(&client))
                     });
 
                     if let Err(err) = http1::Builder::new()
@@ -276,6 +172,7 @@ pub async fn run_https_proxy(
 /// * `req` - The incoming HTTP request
 /// * `direct_base_url` - Base URL for rai.moe direct API
 /// * `inject_supporter` - Whether to inject supporter privileges in Bancho responses
+/// * `upstream_server` - The upstream server domain (e.g., "ppy.sh" or "ripple.moe")
 /// * `state` - Shared application state for statistics
 /// * `client` - Shared HTTP client for upstream requests
 ///
@@ -287,6 +184,7 @@ async fn handle_request(
     req: Request<Incoming>,
     direct_base_url: String,
     inject_supporter: bool,
+    upstream_server: String,
     state: Arc<RwLock<AppState>>,
     client: Arc<reqwest::Client>,
 ) -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
@@ -331,10 +229,12 @@ async fn handle_request(
             }
             forward_to_raimoe(req, &direct_base_url, &client).await
         }
-        RouteDecision::ForwardToPpy => forward_to_ppy(req, &host, inject_supporter, &client).await,
-        RouteDecision::RedirectToPpy => {
-            let ppy_host = map_host_to_ppy(&host);
-            let redirect_url = format!("https://{}{}", ppy_host, path);
+        RouteDecision::ForwardToUpstream => {
+            forward_to_upstream(req, &host, inject_supporter, &upstream_server, &client).await
+        }
+        RouteDecision::RedirectToUpstream => {
+            let upstream_host = map_host_to_upstream(&host, &upstream_server);
+            let redirect_url = format!("https://{}{}", upstream_host, path);
             tracing::debug!("Redirecting to: {}", redirect_url);
             redirect_response(&redirect_url)
         }
@@ -381,87 +281,34 @@ async fn forward_to_raimoe(
     }
 }
 
-/// Forwards a request to the official osu! servers.
-///
-/// Maps the incoming host to the appropriate `*.ppy.sh` domain and forwards
-/// the request over HTTPS. If `inject_supporter` is enabled and this is a
-/// Bancho request (to c.ppy.sh), the response body is parsed for UserPrivileges
-/// packets and supporter status is injected.
-///
-/// # Host Mapping
-///
-/// - `c.*`, `c1.*`, `ce.*` -> `c.ppy.sh` (Bancho)
-/// - `a.*` -> `a.ppy.sh` (avatars)
-/// - `b.*` -> `b.ppy.sh` (beatmap assets)
-/// - `s.*` -> `s.ppy.sh` (spectator)
-/// - Everything else -> `osu.ppy.sh`
-///
-/// # Arguments
-///
-/// * `req` - The incoming HTTP request
-/// * `host` - The original host header value
-/// * `inject_supporter` - Whether to inject supporter privileges in Bancho responses
-/// * `client` - HTTP client for making the upstream request
-///
-/// # Returns
-///
-/// The response from ppy.sh, or a 502 Bad Gateway response on failure.
-async fn forward_to_ppy(
+async fn forward_to_upstream(
     req: Request<Incoming>,
     host: &str,
     inject_supporter: bool,
+    upstream_server: &str,
     client: &reqwest::Client,
 ) -> Response<BoxBody<Bytes, Infallible>> {
-    let ppy_host = map_host_to_ppy(host);
+    let upstream_host = map_host_to_upstream(host, upstream_server);
     let path = req
         .uri()
         .path_and_query()
         .map(|pq| pq.as_str())
         .unwrap_or("/");
-    let url = format!("https://{}{}", ppy_host, path);
+    let url = format!("https://{}{}", upstream_host, path);
 
-    tracing::debug!("Forwarding to ppy.sh: {}", url);
+    tracing::debug!("Forwarding to {}: {}", upstream_server, url);
 
-    // Check if this is a Bancho request (c.ppy.sh) that needs supporter injection
-    let is_bancho = ppy_host == "c.ppy.sh";
+    let is_bancho = upstream_host.starts_with("c.");
 
     match forward_request_with_injection(req, &url, client, inject_supporter && is_bancho).await {
         Ok(resp) => resp,
         Err(e) => {
-            tracing::error!("Failed to forward to ppy.sh: {}", e);
+            tracing::error!("Failed to forward to {}: {}", upstream_server, e);
             error_response(StatusCode::BAD_GATEWAY, "Failed to reach osu! servers")
         }
     }
 }
 
-/// Forwards an HTTP request to the specified URL.
-///
-/// This is the core forwarding function used by `forward_to_raimoe`.
-/// It handles:
-///
-/// - HTTP method conversion (hyper -> reqwest)
-/// - Header forwarding (excluding hop-by-hop headers)
-/// - Request body forwarding
-/// - Response construction
-///
-/// # Filtered Headers
-///
-/// The following headers are not forwarded (they are hop-by-hop or would
-/// cause issues with the proxy):
-///
-/// - `Host` (replaced by target host)
-/// - `Connection`, `Keep-Alive`
-/// - `Transfer-Encoding`, `TE`, `Trailer`
-///
-/// # Arguments
-///
-/// * `req` - The incoming HTTP request
-/// * `url` - The full URL to forward to
-/// * `client` - HTTP client for making the request
-///
-/// # Returns
-///
-/// The upstream response converted to a hyper response, or a reqwest error.
 async fn forward_request(
     req: Request<Incoming>,
     url: &str,

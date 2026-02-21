@@ -43,15 +43,25 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             let has_launch_osu = args.iter().any(|a| a == "--launch-osu");
+            let devserver = args
+                .iter()
+                .position(|a| a == "--devserver")
+                .and_then(|i| args.get(i + 1))
+                .map(|s| s.to_string());
 
             if has_launch_osu {
                 tracing::info!("Second instance with --launch-osu, triggering osu! launch");
+                if let Some(ref server) = devserver {
+                    tracing::info!("Using custom devserver: {}", server);
+                }
                 let app_handle = app.clone();
                 tauri::async_runtime::spawn(async move {
                     let state = app_handle.state::<TauriState>();
-                    let config = state.config.read().clone();
+                    let mut config = state.config.read().clone();
+                    if let Some(ref server) = devserver {
+                        config.proxy.upstream_server = server.clone();
+                    }
 
-                    // Check if proxy is already running
                     let proxy_running = state.proxy.read().is_some();
 
                     if !proxy_running {
@@ -106,6 +116,12 @@ pub fn run() {
 
             let has_minimized_flag = std::env::args().any(|a| a == "--minimized");
             let has_launch_osu_flag = std::env::args().any(|a| a == "--launch-osu");
+            let args: Vec<String> = std::env::args().collect();
+            let devserver = args
+                .iter()
+                .position(|a| a == "--devserver")
+                .and_then(|i| args.get(i + 1))
+                .cloned();
 
             if has_launch_osu_flag {
                 if let Some(window) = app.get_webview_window("main") {
@@ -113,7 +129,11 @@ pub fn run() {
                 }
 
                 let app_handle = app.handle().clone();
-                let config_clone = config.clone();
+                let mut config_clone = config.clone();
+                if let Some(ref server) = devserver {
+                    tracing::info!("Using custom devserver: {}", server);
+                    config_clone.proxy.upstream_server = server.clone();
+                }
 
                 tauri::async_runtime::spawn(async move {
                     tracing::info!("--launch-osu: Starting proxy and launching osu!");

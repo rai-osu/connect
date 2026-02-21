@@ -81,6 +81,7 @@ impl ProxyManager {
                 https_config.https_port,
                 &https_config.direct_base_url,
                 https_config.inject_supporter,
+                &https_config.upstream_server,
                 https_state,
                 http_rx,
                 Some(http_ready_tx),
@@ -116,6 +117,10 @@ impl ProxyManager {
     pub async fn stop(&mut self) -> Result<(), String> {
         if let Some(tx) = self.http_shutdown.take() {
             let _ = tx.send(());
+        }
+
+        if let Err(e) = hosts::remove_hosts_entries() {
+            tracing::warn!("Failed to remove hosts entries: {}", e);
         }
 
         {

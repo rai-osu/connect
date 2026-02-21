@@ -1,8 +1,8 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RouteDecision {
     HandleLocally,
-    ForwardToPpy,
-    RedirectToPpy,
+    ForwardToUpstream,
+    RedirectToUpstream,
 }
 
 pub fn route_request(host: &str, path: &str) -> RouteDecision {
@@ -29,11 +29,11 @@ pub fn route_request(host: &str, path: &str) -> RouteDecision {
     // API paths need transparent proxying (osu! client expects exact responses)
     if host.ends_with("c.ppy.sh") || host.ends_with("c.localhost") {
         // Bancho server - always proxy
-        return RouteDecision::ForwardToPpy;
+        return RouteDecision::ForwardToUpstream;
     }
 
     if path.starts_with("/api/") || path.starts_with("/oauth/") || path.starts_with("/web/") {
-        return RouteDecision::ForwardToPpy;
+        return RouteDecision::ForwardToUpstream;
     }
 
     // Asset subdomains should proxy (avatars, beatmap assets, etc.)
@@ -44,49 +44,25 @@ pub fn route_request(host: &str, path: &str) -> RouteDecision {
         || host.ends_with("i.ppy.sh")
         || host.ends_with("i.localhost")
     {
-        return RouteDecision::ForwardToPpy;
+        return RouteDecision::ForwardToUpstream;
     }
 
     // Website paths - redirect browser to real osu.ppy.sh
-    RouteDecision::RedirectToPpy
+    RouteDecision::RedirectToUpstream
 }
 
 pub fn map_to_raimoe_url(original_path: &str, direct_base_url: &str) -> String {
     format!("{}{}", direct_base_url.trim_end_matches('/'), original_path)
 }
 
-/// Maps a host from the local proxy to the corresponding ppy.sh subdomain.
-///
-/// This is the single source of truth for host mapping logic.
-/// Handles all known osu! subdomains:
-/// - `c.*`, `c1.*`, `ce.*` -> `c.ppy.sh` (Bancho/chat)
-/// - `a.*` -> `a.ppy.sh` (Avatars)
-/// - `b.*` -> `b.ppy.sh` (Beatmap assets)
-/// - `s.*` -> `s.ppy.sh` (Spectator)
-/// - `i.*` -> `i.ppy.sh` (Images)
-/// - Default -> `osu.ppy.sh`
-pub fn map_host_to_ppy(host: &str) -> &'static str {
-    // Strip port if present
+pub fn map_host_to_upstream(host: &str, upstream_server: &str) -> String {
     let host = host.split(':').next().unwrap_or(host);
-
-    if host.starts_with("c.") || host.starts_with("c1.") || host.starts_with("ce.") {
-        "c.ppy.sh"
-    } else if host.starts_with("a.") {
-        "a.ppy.sh"
-    } else if host.starts_with("b.") {
-        "b.ppy.sh"
-    } else if host.starts_with("s.") {
-        "s.ppy.sh"
-    } else if host.starts_with("i.") {
-        "i.ppy.sh"
-    } else {
-        "osu.ppy.sh"
-    }
-}
-
-pub fn map_to_ppy_url(host: &str, path: &str) -> String {
-    let ppy_host = map_host_to_ppy(host);
-    format!("https://{}{}", ppy_host, path)
+    let subdomain = host.find('.').map(|pos| &host[..pos]).unwrap_or("osu");
+    let subdomain = match subdomain {
+        "c1" | "ce" => "c",
+        other => other,
+    };
+    format!("{}.{}", subdomain, upstream_server)
 }
 
 #[cfg(test)]
@@ -113,13 +89,16 @@ mod tests {
     fn test_route_login_forwards() {
         assert_eq!(
             route_request("osu.ppy.sh", "/web/osu-submit-modular-selector.php"),
-            RouteDecision::ForwardToPpy
+            RouteDecision::ForwardToUpstream
         );
     }
 
     #[test]
     fn test_route_bancho_forwards() {
-        assert_eq!(route_request("c.ppy.sh", "/"), RouteDecision::ForwardToPpy);
+        assert_eq!(
+            route_request("c.ppy.sh", "/"),
+            RouteDecision::ForwardToUpstream
+        );
     }
 
     #[test]
@@ -134,13 +113,13 @@ mod tests {
     #[test]
     fn test_ce_subdomain_forwards_to_bancho() {
         // ce.* is used for Bancho connections in some regions
-        assert_eq!(map_host_to_ppy("ce.ppy.sh"), "c.ppy.sh");
-        assert_eq!(map_host_to_ppy("ce.osu.ppy.sh"), "c.ppy.sh");
+        assert_eq!(map_host_to_upstream("ce.ppy.sh", "ppy.sh"), "c.ppy.sh");
+        assert_eq!(map_host_to_upstream("ce.osu.ppy.sh", "ppy.sh"), "c.ppy.sh");
     }
 
     #[test]
     fn test_c1_subdomain_forwards_to_bancho() {
-        assert_eq!(map_host_to_ppy("c1.ppy.sh"), "c.ppy.sh");
+        assert_eq!(map_host_to_upstream("c1.ppy.sh", "ppy.sh"), "c.ppy.sh");
     }
 
     // Port stripping tests
@@ -162,10 +141,13 @@ mod tests {
     }
 
     #[test]
-    fn test_map_host_to_ppy_strips_port() {
-        assert_eq!(map_host_to_ppy("c.ppy.sh:443"), "c.ppy.sh");
-        assert_eq!(map_host_to_ppy("a.ppy.sh:80"), "a.ppy.sh");
-        assert_eq!(map_host_to_ppy("osu.ppy.sh:8080"), "osu.ppy.sh");
+    fn test_map_host_to_upstream_strips_port() {
+        assert_eq!(map_host_to_upstream("c.ppy.sh:443", "ppy.sh"), "c.ppy.sh");
+        assert_eq!(map_host_to_upstream("a.ppy.sh:80", "ppy.sh"), "a.ppy.sh");
+        assert_eq!(
+            map_host_to_upstream("osu.ppy.sh:8080", "ppy.sh"),
+            "osu.ppy.sh"
+        );
     }
 
     // Empty and edge path handling - website paths redirect to ppy.sh
@@ -173,7 +155,7 @@ mod tests {
     fn test_empty_path_redirects() {
         assert_eq!(
             route_request("osu.ppy.sh", ""),
-            RouteDecision::RedirectToPpy
+            RouteDecision::RedirectToUpstream
         );
     }
 
@@ -181,7 +163,7 @@ mod tests {
     fn test_root_path_redirects() {
         assert_eq!(
             route_request("osu.ppy.sh", "/"),
-            RouteDecision::RedirectToPpy
+            RouteDecision::RedirectToUpstream
         );
     }
 
@@ -190,11 +172,11 @@ mod tests {
         // Paths without leading slash shouldn't match our patterns, redirect to website
         assert_eq!(
             route_request("osu.ppy.sh", "d/123456"),
-            RouteDecision::RedirectToPpy
+            RouteDecision::RedirectToUpstream
         );
         assert_eq!(
             route_request("osu.ppy.sh", "web/osu-search.php"),
-            RouteDecision::RedirectToPpy
+            RouteDecision::RedirectToUpstream
         );
     }
 
@@ -206,11 +188,11 @@ mod tests {
         // /web/ paths forward (API pattern), /d/ paths redirect (not locally handled)
         assert_eq!(
             route_request("osu.ppy.sh.evil.com", "/web/osu-search.php"),
-            RouteDecision::ForwardToPpy // matches /web/ API pattern
+            RouteDecision::ForwardToUpstream // matches /web/ API pattern
         );
         assert_eq!(
             route_request("osu.ppy.sh.evil.com", "/d/123456"),
-            RouteDecision::RedirectToPpy // doesn't match any pattern
+            RouteDecision::RedirectToUpstream // doesn't match any pattern
         );
     }
 
@@ -230,7 +212,7 @@ mod tests {
         // Non-osu!direct paths redirect to the website
         assert_eq!(
             route_request("sub.osu.ppy.sh", "/home"),
-            RouteDecision::RedirectToPpy
+            RouteDecision::RedirectToUpstream
         );
     }
 
@@ -240,7 +222,7 @@ mod tests {
         // Redirects because it doesn't match known asset domains
         assert_eq!(
             route_request("b.ppy.sh.evil.com", "/thumb/123.jpg"),
-            RouteDecision::RedirectToPpy
+            RouteDecision::RedirectToUpstream
         );
     }
 
@@ -313,28 +295,56 @@ mod tests {
         );
     }
 
-    // map_to_ppy_url tests
+    // map_host_to_upstream tests
     #[test]
-    fn test_map_to_ppy_url_basic() {
+    fn test_map_host_to_upstream_known_subdomains() {
+        assert_eq!(map_host_to_upstream("a.localhost", "ppy.sh"), "a.ppy.sh");
+        assert_eq!(map_host_to_upstream("b.localhost", "ppy.sh"), "b.ppy.sh");
+        assert_eq!(map_host_to_upstream("c.localhost", "ppy.sh"), "c.ppy.sh");
+        assert_eq!(map_host_to_upstream("s.localhost", "ppy.sh"), "s.ppy.sh");
+        assert_eq!(map_host_to_upstream("i.localhost", "ppy.sh"), "i.ppy.sh");
         assert_eq!(
-            map_to_ppy_url("osu.ppy.sh", "/web/test"),
-            "https://osu.ppy.sh/web/test"
+            map_host_to_upstream("osu.localhost", "ppy.sh"),
+            "osu.ppy.sh"
         );
     }
 
     #[test]
-    fn test_map_to_ppy_url_with_port() {
-        assert_eq!(map_to_ppy_url("c.ppy.sh:443", "/"), "https://c.ppy.sh/");
+    fn test_map_host_to_upstream_bancho_variants() {
+        assert_eq!(map_host_to_upstream("c1.localhost", "ppy.sh"), "c.ppy.sh");
+        assert_eq!(map_host_to_upstream("ce.localhost", "ppy.sh"), "c.ppy.sh");
     }
 
-    // Additional map_host_to_ppy coverage
     #[test]
-    fn test_map_host_to_ppy_all_subdomains() {
-        assert_eq!(map_host_to_ppy("a.ppy.sh"), "a.ppy.sh");
-        assert_eq!(map_host_to_ppy("b.ppy.sh"), "b.ppy.sh");
-        assert_eq!(map_host_to_ppy("c.ppy.sh"), "c.ppy.sh");
-        assert_eq!(map_host_to_ppy("s.ppy.sh"), "s.ppy.sh");
-        assert_eq!(map_host_to_ppy("i.ppy.sh"), "i.ppy.sh");
-        assert_eq!(map_host_to_ppy("unknown.ppy.sh"), "osu.ppy.sh");
+    fn test_map_host_to_upstream_preserves_unknown() {
+        assert_eq!(
+            map_host_to_upstream("store.localhost", "ppy.sh"),
+            "store.ppy.sh"
+        );
+        assert_eq!(
+            map_host_to_upstream("api.localhost", "ppy.sh"),
+            "api.ppy.sh"
+        );
+    }
+
+    #[test]
+    fn test_map_host_to_upstream_custom_server() {
+        assert_eq!(
+            map_host_to_upstream("c.localhost", "ripple.moe"),
+            "c.ripple.moe"
+        );
+        assert_eq!(
+            map_host_to_upstream("osu.localhost", "ripple.moe"),
+            "osu.ripple.moe"
+        );
+        assert_eq!(
+            map_host_to_upstream("a.localhost", "ripple.moe"),
+            "a.ripple.moe"
+        );
+    }
+
+    #[test]
+    fn test_map_host_to_upstream_fallback() {
+        assert_eq!(map_host_to_upstream("localhost", "ppy.sh"), "osu.ppy.sh");
     }
 }

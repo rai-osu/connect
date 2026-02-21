@@ -36,6 +36,12 @@ pub struct ProxyConfig {
     pub inject_supporter: bool,
     pub api_base_url: String,
     pub direct_base_url: String,
+    #[serde(default = "default_upstream_server")]
+    pub upstream_server: String,
+}
+
+fn default_upstream_server() -> String {
+    "ppy.sh".to_string()
 }
 
 impl Default for ProxyConfig {
@@ -45,6 +51,7 @@ impl Default for ProxyConfig {
             inject_supporter: false,
             api_base_url: "https://api.rai.moe".to_string(),
             direct_base_url: "https://direct.rai.moe".to_string(),
+            upstream_server: default_upstream_server(),
         }
     }
 }
