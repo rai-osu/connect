@@ -34,6 +34,18 @@ use crate::domain::{
 };
 use crate::infrastructure::tls::create_tls_acceptor;
 
+/// Checks if host is localhost, 127.0.0.1, [::1], or *.localhost (with optional port).
+fn is_valid_localhost_host(host: &str) -> bool {
+    let host_without_port = if host.starts_with('[') {
+        host.find(']').map(|i| &host[..=i]).unwrap_or(host)
+    } else {
+        host.split(':').next().unwrap_or(host)
+    };
+
+    let h = host_without_port.to_lowercase();
+    h == "localhost" || h == "127.0.0.1" || h == "[::1]" || h.ends_with(".localhost")
+}
+
 /// Runs the HTTP proxy server.
 ///
 /// Listens on the specified port and handles incoming HTTP requests from the
@@ -284,6 +296,17 @@ async fn handle_request(
         .and_then(|h| h.to_str().ok())
         .unwrap_or("localhost")
         .to_string();
+
+    if !is_valid_localhost_host(&host) {
+        tracing::warn!(
+            "Rejected request with invalid host header: {} (expected localhost)",
+            host
+        );
+        return Ok(error_response(
+            StatusCode::BAD_REQUEST,
+            "Invalid host header: only localhost connections are allowed",
+        ));
+    }
 
     let path = req
         .uri()
@@ -592,4 +615,89 @@ fn error_response(status: StatusCode, message: &str) -> Response<BoxBody<Bytes, 
                 .boxed(),
         )
         .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_localhost_valid() {
+        assert!(is_valid_localhost_host("localhost"));
+        assert!(is_valid_localhost_host("LOCALHOST"));
+        assert!(is_valid_localhost_host("LocalHost"));
+    }
+
+    #[test]
+    fn test_localhost_with_port_valid() {
+        assert!(is_valid_localhost_host("localhost:80"));
+        assert!(is_valid_localhost_host("localhost:443"));
+        assert!(is_valid_localhost_host("localhost:8080"));
+    }
+
+    #[test]
+    fn test_ipv4_localhost_valid() {
+        assert!(is_valid_localhost_host("127.0.0.1"));
+        assert!(is_valid_localhost_host("127.0.0.1:80"));
+        assert!(is_valid_localhost_host("127.0.0.1:443"));
+    }
+
+    #[test]
+    fn test_ipv6_localhost_valid() {
+        assert!(is_valid_localhost_host("[::1]"));
+        assert!(is_valid_localhost_host("[::1]:80"));
+        assert!(is_valid_localhost_host("[::1]:443"));
+    }
+
+    #[test]
+    fn test_localhost_subdomains_valid() {
+        assert!(is_valid_localhost_host("osu.localhost"));
+        assert!(is_valid_localhost_host("c.localhost"));
+        assert!(is_valid_localhost_host("a.localhost"));
+        assert!(is_valid_localhost_host("b.localhost"));
+        assert!(is_valid_localhost_host("sub.domain.localhost"));
+        assert!(is_valid_localhost_host("osu.localhost:80"));
+        assert!(is_valid_localhost_host("c.localhost:443"));
+    }
+
+    #[test]
+    fn test_external_hosts_rejected() {
+        assert!(!is_valid_localhost_host("example.com"));
+        assert!(!is_valid_localhost_host("osu.ppy.sh"));
+        assert!(!is_valid_localhost_host("evil.com"));
+        assert!(!is_valid_localhost_host("google.com:443"));
+    }
+
+    #[test]
+    fn test_malicious_hosts_rejected() {
+        assert!(!is_valid_localhost_host("localhost.evil.com"));
+        assert!(!is_valid_localhost_host("127.0.0.1.evil.com"));
+        assert!(!is_valid_localhost_host("notlocalhost"));
+        assert!(!is_valid_localhost_host("localhost@evil.com"));
+        assert!(!is_valid_localhost_host("evil.com:localhost"));
+    }
+
+    #[test]
+    fn test_other_loopback_addresses_rejected() {
+        assert!(!is_valid_localhost_host("127.0.0.2"));
+        assert!(!is_valid_localhost_host("127.1.1.1"));
+    }
+
+    #[test]
+    fn test_private_networks_rejected() {
+        assert!(!is_valid_localhost_host("192.168.1.1"));
+        assert!(!is_valid_localhost_host("10.0.0.1"));
+        assert!(!is_valid_localhost_host("172.16.0.1"));
+    }
+
+    #[test]
+    fn test_empty_host_rejected() {
+        assert!(!is_valid_localhost_host(""));
+    }
+
+    #[test]
+    fn test_ipv6_malformed_rejected() {
+        assert!(!is_valid_localhost_host("::1"));
+        assert!(!is_valid_localhost_host("[::2]"));
+    }
 }
