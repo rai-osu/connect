@@ -63,7 +63,7 @@ keyring = { version = "3.6", features = ["linux-native", "windows-native", "appl
 
 [target.'cfg(windows)'.dependencies]
 mslnk = "0.1"
-windows = { version = "0.58", features = [
+windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_System_Threading",
