@@ -56,7 +56,7 @@ bytes = "1"
 once_cell = "1"
 parking_lot = "0.12"
 chrono = "0.4"
-dirs = "5"
+dirs = "6"
 
 # Secure key storage (platform-specific: linux-native, windows-native, apple-native)
 keyring = { version = "3.6", features = ["linux-native", "windows-native", "apple-native"] }
