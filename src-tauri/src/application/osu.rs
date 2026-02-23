@@ -98,7 +98,7 @@ mod deelevate {
                 primary_token.0,
                 LOGON_WITH_PROFILE,
                 None,
-                windows::core::PWSTR(cmd_wide.as_mut_ptr()),
+                Some(windows::core::PWSTR(cmd_wide.as_mut_ptr())),
                 windows::Win32::System::Threading::PROCESS_CREATION_FLAGS(0),
                 None,
                 windows::core::PCWSTR(working_dir_wide.as_ptr()),
