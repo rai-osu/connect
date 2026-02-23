@@ -41,7 +41,7 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-feature
 tokio-rustls = "0.26"
 rustls = { version = "0.23", features = ["ring"] }
 rustls-pemfile = "2"
-rcgen = { version = "0.13", features = ["ring"] }
+rcgen = { version = "0.14", features = ["ring"] }
 
 # Error handling
 thiserror = "2"
