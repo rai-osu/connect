@@ -55,3 +55,33 @@ jobs:
 
       - name: Test Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  check-platforms:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: ${{ matrix.target }}
+
+      - name: Check compilation
+        run: cargo check --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
