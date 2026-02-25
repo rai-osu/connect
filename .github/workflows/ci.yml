@@ -116,6 +116,9 @@ jobs:
           workspaces: src-tauri -> target
           shared-key: macos
 
+      - name: Create mock frontend dist
+        run: mkdir -p build && echo '<!DOCTYPE html><html><body></body></html>' > build/index.html
+
       - name: Check aarch64
         run: cargo check --manifest-path src-tauri/Cargo.toml --target aarch64-apple-darwin
 
@@ -141,6 +144,11 @@ jobs:
         with:
           workspaces: src-tauri -> target
           shared-key: windows
+
+      - name: Create mock frontend dist
+        run: |
+          New-Item -ItemType Directory -Force -Path build
+          Set-Content -Path build/index.html -Value '<!DOCTYPE html><html><body></body></html>'
 
       - name: Check compilation
         run: cargo check --manifest-path src-tauri/Cargo.toml
