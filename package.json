@@ -30,14 +30,14 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.10",
-    "@sveltejs/kit": "^2.53.1",
+    "@sveltejs/kit": "^2.53.3",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@tailwindcss/vite": "^4.2.1",
     "@tauri-apps/cli": "^2.10.0",
-    "@types/node": "^25.3.0",
+    "@types/node": "^25.3.2",
     "lefthook": "^2.1.1",
-    "svelte": "^5.53.3",
-    "svelte-check": "^4.4.3",
+    "svelte": "^5.53.5",
+    "svelte-check": "^4.4.4",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
